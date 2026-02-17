@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<routes>
+
+    <vType id="car" accel="2.6" decel="4.5" length="5" maxSpeed="13.9"/>
+
+    <!-- ========================= -->
+    <!-- ROUTES (Left / Straight / Right) -->
+    <!-- ========================= -->
+
+    <!-- From North -->
+    <route id="N_to_S" edges="N_J1 J1_S"/>
+    <route id="N_to_E" edges="N_J1 J1_E"/>
+    <route id="N_to_W" edges="N_J1 J1_W"/>
+
+    <!-- From South -->
+    <route id="S_to_N" edges="S_J1 J1_N"/>
+    <route id="S_to_E" edges="S_J1 J1_E"/>
+    <route id="S_to_W" edges="S_J1 J1_W"/>
+
+    <!-- From East -->
+    <route id="E_to_W" edges="E_J1 J1_W"/>
+    <route id="E_to_N" edges="E_J1 J1_N"/>
+    <route id="E_to_S" edges="E_J1 J1_S"/>
+
+    <!-- From West -->
+    <route id="W_to_E" edges="W_J1 J1_E"/>
+    <route id="W_to_N" edges="W_J1 J1_N"/>
+    <route id="W_to_S" edges="W_J1 J1_S"/>
+
+    <!-- Traffic Flows -->
+
+    <flow id="flow1" type="car" route="N_to_S" begin="0" end="3600" vehsPerHour="80"/>
+    <flow id="flow2" type="car" route="S_to_N" begin="0" end="3600" vehsPerHour="80"/>
+    <flow id="flow3" type="car" route="E_to_W" begin="0" end="3600" vehsPerHour="80"/>
+    <flow id="flow4" type="car" route="W_to_E" begin="0" end="3600" vehsPerHour="80"/>
+
+    <!-- Turning flows -->
+    <flow id="turn1" type="car" route="N_to_E" begin="0" end="3600" vehsPerHour="30"/>
+    <flow id="turn2" type="car" route="S_to_W" begin="0" end="3600" vehsPerHour="30"/>
+    <flow id="turn3" type="car" route="E_to_N" begin="0" end="3600" vehsPerHour="30"/>
+    <flow id="turn4" type="car" route="W_to_S" begin="0" end="3600" vehsPerHour="30"/>
+
+</routes>
