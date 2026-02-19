@@ -9,6 +9,10 @@ from core.side_selector import select_side
 from core.phase_manager import calculate_cascading_red
 from core.signal_controller import apply_green, apply_yellow
 from analytics.csv_logger import CSVLogger
+from analytics.plot_metrics import plot_metrics
+from shared_state import state
+from live_status_writer import write_live_status
+
 
 
 # =============================
@@ -54,6 +58,21 @@ while cycle < 50:
     )
 
     vehicle_count = vehicle_counts[current_direction]
+
+    # Update shared state for API
+    state.active_side = current_direction
+    state.vehicle_counts = vehicle_counts
+    state.average_wait = metrics.get_average_wait()
+    state.throughput = metrics.get_throughput()
+
+    # 🔥 WRITE LIVE STATUS FOR API
+    write_live_status(
+        current_direction,
+        vehicle_counts,
+        metrics.get_average_wait(),
+        metrics.get_throughput()
+    )
+
 
     # 3️⃣ Adaptive green time
     green_time = min(
@@ -132,3 +151,4 @@ while cycle < 50:
     cycle += 1
 
 traci.close()
+plot_metrics()
