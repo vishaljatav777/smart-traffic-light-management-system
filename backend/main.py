@@ -1,9 +1,18 @@
 from fastapi import FastAPI
 import json
 from traffic_service import TrafficService
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 traffic_service = TrafficService()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/")
 def root():
