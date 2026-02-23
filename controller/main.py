@@ -3,17 +3,20 @@ import os
 import sys
 import config
 
-from analytics.traffic_analyzer import get_vehicle_counts
+from analytics.traffic_analyzer import (
+    get_vehicle_counts,
+    detect_emergency_vehicle,
+    apply_police_siren_effect
+)
 from analytics.metrics import TrafficMetrics
+from analytics.csv_logger import CSVLogger
+from analytics.plot_metrics import plot_metrics
+
 from core.side_selector import select_side
 from core.phase_manager import calculate_cascading_red
 from core.signal_controller import apply_green, apply_yellow
-from analytics.csv_logger import CSVLogger
-from analytics.plot_metrics import plot_metrics
-from shared_state import state
+
 from live_status_writer import write_live_status
-
-
 
 # =============================
 # SUMO SETUP
@@ -50,29 +53,20 @@ while cycle < 50:
     # 1️⃣ Get vehicle counts
     vehicle_counts = get_vehicle_counts(config.DIRECTIONS)
 
-    # 2️⃣ Select side intelligently (starvation + max vehicle)
-    current_direction = select_side(
-        vehicle_counts,
-        waiting_cycles,
-        config.STARVATION_THRESHOLD
-    )
+    # 2️⃣ Emergency override check
+    emergency_direction = detect_emergency_vehicle(config.DIRECTIONS)
+
+    if emergency_direction:
+        current_direction = emergency_direction
+        print("🚨 EMERGENCY OVERRIDE ACTIVE")
+    else:
+        current_direction = select_side(
+            vehicle_counts,
+            waiting_cycles,
+            config.STARVATION_THRESHOLD
+        )
 
     vehicle_count = vehicle_counts[current_direction]
-
-    # Update shared state for API
-    state.active_side = current_direction
-    state.vehicle_counts = vehicle_counts
-    state.average_wait = metrics.get_average_wait()
-    state.throughput = metrics.get_throughput()
-
-    # 🔥 WRITE LIVE STATUS FOR API
-    write_live_status(
-        current_direction,
-        vehicle_counts,
-        metrics.get_average_wait(),
-        metrics.get_throughput()
-    )
-
 
     # 3️⃣ Adaptive green time
     green_time = min(
@@ -113,11 +107,14 @@ while cycle < 50:
     for side in red_times:
         print(f"{side} → LEFT | STRAIGHT | RIGHT = STOP ({red_times[side]}s)")
 
-    # Print performance metrics
+    # Performance metrics
     print("\n📊 PERFORMANCE METRICS")
     print(f"Average Waiting Time: {metrics.get_average_wait():.2f}s")
     print(f"Throughput: {metrics.get_throughput()} vehicles")
 
+    print("===================================================")
+
+    # Save CSV log
     csv_logger.log(
         cycle,
         current_direction,
@@ -127,8 +124,13 @@ while cycle < 50:
         metrics.get_throughput()
     )
 
-
-    print("===================================================")
+    # Save live JSON for API
+    write_live_status(
+        current_direction,
+        vehicle_counts,
+        metrics.get_average_wait(),
+        metrics.get_throughput()
+    )
 
     # =============================
     # RUN GREEN PHASE
@@ -137,6 +139,7 @@ while cycle < 50:
         traci.simulationStep()
         metrics.update()
         metrics.vehicle_arrived()
+        apply_police_siren_effect()   # 🔥 Police flashing
 
     # =============================
     # APPLY YELLOW PHASE
@@ -147,8 +150,14 @@ while cycle < 50:
         traci.simulationStep()
         metrics.update()
         metrics.vehicle_arrived()
+        apply_police_siren_effect()   # 🔥 Police flashing
 
     cycle += 1
 
+# =============================
+# END SIMULATION
+# =============================
 traci.close()
+
+# Plot metrics after simulation
 plot_metrics()

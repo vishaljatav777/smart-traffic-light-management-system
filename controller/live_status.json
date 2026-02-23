@@ -1,1 +1,1 @@
-{"active_side": "S_J1", "vehicle_counts": {"N_J1": 8, "E_J1": 4, "S_J1": 13, "W_J1": 12}, "average_wait": 275.76, "throughput": 38}
+{"active_side": "E_J1", "vehicle_counts": {"N_J1": 1, "E_J1": 1, "S_J1": 1, "W_J1": 1}, "average_wait": 1452.2, "throughput": 30}

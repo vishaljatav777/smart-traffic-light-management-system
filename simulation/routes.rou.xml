@@ -41,4 +41,80 @@
     <flow id="turn3" type="car" route="E_to_N" begin="0" end="3600" vehsPerHour="30"/>
     <flow id="turn4" type="car" route="W_to_S" begin="0" end="3600" vehsPerHour="30"/>
 
+    <!-- ========================= -->
+<!-- VEHICLE TYPES WITH COLORS -->
+<!-- ========================= -->
+
+<vType id="ambulance"
+       accel="3.0"
+       decel="6.0"
+       length="5"
+       maxSpeed="20"
+       color="255,255,255"/>
+
+<vType id="police"
+       accel="3.2"
+       decel="6.0"
+       length="5"
+       maxSpeed="22"
+       color="128,128,128"/>
+
+<vType id="emergency"
+       accel="3.5"
+       decel="6.5"
+       length="5"
+       maxSpeed="22"
+       color="255,0,0"/>
+
+<vType id="truck"
+       accel="1.5"
+       decel="4.0"
+       length="8"
+       maxSpeed="12"
+       color="0,0,255"/>
+
+<vType id="bus"
+       accel="1.8"
+       decel="4.0"
+       length="10"
+       maxSpeed="14"
+       color="128,0,128"/>
+
+<!-- Emergency Vehicles -->
+<flow id="ambulance_flow"
+      type="ambulance"
+      route="N_to_S"
+      begin="50"
+      end="120"
+      vehsPerHour="30"/>
+
+<flow id="police_flow"
+      type="police"
+      route="E_to_W"
+      begin="80"
+      end="150"
+      vehsPerHour="20"/>
+
+<flow id="emergency_flow"
+      type="emergency"
+      route="S_to_N"
+      begin="100"
+      end="180"
+      vehsPerHour="25"/>
+
+<!-- Heavy Vehicles -->
+<flow id="truck_flow"
+      type="truck"
+      route="W_to_E"
+      begin="0"
+      end="3600"
+      vehsPerHour="200"/>
+
+<flow id="bus_flow"
+      type="bus"
+      route="N_to_E"
+      begin="0"
+      end="3600"
+      vehsPerHour="100"/>
+
 </routes>

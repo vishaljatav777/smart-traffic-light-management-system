@@ -34,3 +34,6 @@ def live_status():
         return data
     except:
         return {"status": "No live data available"}
+
+# backend run command
+# python -m uvicorn main:app --reload
