@@ -1,22 +1,45 @@
 import traci
 
-def get_vehicle_counts(directions):
-    counts = {}
-    for d in directions:
-        counts[d] = traci.edge.getLastStepVehicleNumber(d)
-    return counts
-
-def detect_emergency_vehicle(directions):
+def get_detailed_stats(directions):
     import traci
+    stats = {
+        "emergency_detected": False,
+        "emergency_direction": None,
+        "emergency_type": None,
+        "types": {
+            "car": 0,
+            "bus": 0,
+            "truck": 0,
+            "ambulance": 0,
+            "emergency": 0,
+            "police": 0
+        }
+    }
+
+    emergency_types = ["emergency", "ambulance", "police"]
 
     for d in directions:
         vehicle_ids = traci.edge.getLastStepVehicleIDs(d)
-
         for vid in vehicle_ids:
-            if traci.vehicle.getTypeID(vid) == "emergency":
-                return d
+            vtype = traci.vehicle.getTypeID(vid).lower()
+            
+            # Count standard types
+            if vtype in stats["types"]:
+                stats["types"][vtype] += 1
+            else:
+                stats["types"]["car"] += 1 # Default to car
+            
+            # Emergency Detection
+            if vtype in emergency_types and not stats["emergency_detected"]:
+                stats["emergency_detected"] = True
+                stats["emergency_direction"] = d
+                stats["emergency_type"] = vtype
 
-    return None
+    return stats
+
+def detect_emergency_vehicle(directions):
+    stats = get_detailed_stats(directions)
+    return stats["emergency_direction"]
 
 def apply_police_siren_effect():
     import traci

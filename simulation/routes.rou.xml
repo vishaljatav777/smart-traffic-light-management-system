@@ -45,6 +45,7 @@
 <!-- VEHICLE TYPES WITH COLORS -->
 <!-- ========================= -->
 
+<!-- white -->
 <vType id="ambulance"
        accel="3.0"
        decel="6.0"
@@ -52,6 +53,7 @@
        maxSpeed="20"
        color="255,255,255"/>
 
+<!-- grey -->
 <vType id="police"
        accel="3.2"
        decel="6.0"
@@ -59,13 +61,14 @@
        maxSpeed="22"
        color="128,128,128"/>
 
+<!-- red -->
 <vType id="emergency"
        accel="3.5"
        decel="6.5"
        length="5"
        maxSpeed="22"
        color="255,0,0"/>
-
+<!-- Blue -->
 <vType id="truck"
        accel="1.5"
        decel="4.0"
@@ -73,6 +76,7 @@
        maxSpeed="12"
        color="0,0,255"/>
 
+<!-- purple -->
 <vType id="bus"
        accel="1.8"
        decel="4.0"
@@ -80,7 +84,22 @@
        maxSpeed="14"
        color="128,0,128"/>
 
-<!-- Emergency Vehicles -->
+<!-- Heavy Vehicles First (begin=0) -->
+<flow id="truck_flow"
+      type="truck"
+      route="W_to_E"
+      begin="0"
+      end="3600"
+      vehsPerHour="200"/>
+
+<flow id="bus_flow"
+      type="bus"
+      route="N_to_E"
+      begin="0"
+      end="3600"
+      vehsPerHour="100"/>
+
+<!-- Emergency Later -->
 <flow id="ambulance_flow"
       type="ambulance"
       route="N_to_S"
@@ -101,20 +120,5 @@
       begin="100"
       end="180"
       vehsPerHour="25"/>
-
-<!-- Heavy Vehicles -->
-<flow id="truck_flow"
-      type="truck"
-      route="W_to_E"
-      begin="0"
-      end="3600"
-      vehsPerHour="200"/>
-
-<flow id="bus_flow"
-      type="bus"
-      route="N_to_E"
-      begin="0"
-      end="3600"
-      vehsPerHour="100"/>
 
 </routes>

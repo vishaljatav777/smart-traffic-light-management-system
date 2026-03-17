@@ -1,1 +1,1 @@
-{"active_side": "E_J1", "vehicle_counts": {"N_J1": 1, "E_J1": 1, "S_J1": 1, "W_J1": 1}, "average_wait": 1452.2, "throughput": 30}
+{"current_direction": "S_J1", "vehicle_counts": {"N_J1": 6, "E_J1": 3, "S_J1": 0, "W_J1": 4}, "average_wait": 31.46, "throughput": 84, "peak_wait": 170.8, "efficiency": 22.2, "phase": "YELLOW", "remaining_time": 1, "detailed_stats": {"emergency_detected": false, "emergency_direction": null, "emergency_type": null, "types": {"car": 11, "bus": 3, "truck": 4, "ambulance": 0, "emergency": 0, "police": 0}}}

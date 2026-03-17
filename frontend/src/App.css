@@ -1,38 +1,107 @@
-.App {
-  text-align: center;
+:root {
+  --bg-dark: #0f172a;
+  --bg-card: rgba(30, 41, 59, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  
+  --color-green: #10b981;
+  --color-yellow: #f59e0b;
+  --color-red: #ef4444;
+  --color-accent: #3b82f6;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.15) 0px, transparent 50%);
+  background-attachment: fixed;
   min-height: 100vh;
+}
+
+/* Glassmorphism Classes */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  border-radius: 16px;
+}
+
+/* Traffic Light Animations */
+.light-bulb {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #334155;
+  transition: all 0.3s ease;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.light-bulb.active-red {
+  background-color: var(--color-red);
+  box-shadow: 0 0 20px var(--color-red), inset 0 -2px 6px rgba(0,0,0,0.3);
+}
+
+.light-bulb.active-yellow {
+  background-color: var(--color-yellow);
+  box-shadow: 0 0 20px var(--color-yellow), inset 0 -2px 6px rgba(0,0,0,0.3);
+}
+
+.light-bulb.active-green {
+  background-color: var(--color-green);
+  box-shadow: 0 0 20px var(--color-green), inset 0 -2px 6px rgba(0,0,0,0.3);
+}
+
+.light-bulb.dimmed {
+  opacity: 0.2;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.8);
+}
+
+.pulse {
+  animation: pulse-glow 1s infinite alternate;
+}
+
+@keyframes pulse-glow {
+  from { box-shadow: 0 0 10px currentColor, inset 0 -2px 6px rgba(0,0,0,0.3); }
+  to { box-shadow: 0 0 25px currentColor, inset 0 -2px 6px rgba(0,0,0,0.3); }
+}
+
+/* Base App Layout Elements */
+.app-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
   display: flex;
   flex-direction: column;
+  gap: 2rem;
+}
+
+.dashboard-header {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  justify-content: space-between;
+  padding: 1rem 2rem;
 }
 
-.App-link {
-  color: #61dafb;
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.chart-container {
+  padding: 1.5rem;
+  min-height: 400px;
 }
+/* Utility Classes */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-5 { gap: 1.25rem; }
+.w-full { width: 100%; }

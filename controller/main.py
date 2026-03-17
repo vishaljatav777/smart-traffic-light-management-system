@@ -1,10 +1,14 @@
-import traci
-import os
 import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import shutil
+import time
+import traci
 import config
 
 from analytics.traffic_analyzer import (
-    get_vehicle_counts,
+    get_detailed_stats,
     detect_emergency_vehicle,
     apply_police_siren_effect
 )
@@ -12,11 +16,16 @@ from analytics.metrics import TrafficMetrics
 from analytics.csv_logger import CSVLogger
 from analytics.plot_metrics import plot_metrics
 
-from core.side_selector import select_side
 from core.phase_manager import calculate_cascading_red
 from core.signal_controller import apply_green, apply_yellow
 
 from live_status_writer import write_live_status
+from ml_models.q_learning_agent import QLearningAgent
+
+# =============================
+# PATHS
+# =============================
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # =============================
 # SUMO SETUP
@@ -27,10 +36,20 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("Please declare SUMO_HOME")
 
-sumoBinary = "sumo-gui"
-sumoCmd = [sumoBinary, "-c", "../simulation/run.sumocfg"]
+# Use headless 'sumo' by default for stability, 'sumo-gui' if you want visuals
+sumoBinary = "sumo-gui" 
+sumoCmd = [
+    sumoBinary, 
+    "-c", os.path.join(BASE_DIR, "simulation", "run.sumocfg"),
+    "--step-length", "0.7"
+]
 
-traci.start(sumoCmd)
+try:
+    traci.start(sumoCmd)
+except traci.exceptions.FatalTraCIError as e:
+    print(f"Failed to connect to SUMO TraCI: {e}")
+    sys.exit(1)
+
 
 # =============================
 # INITIALIZATION
@@ -38,53 +57,60 @@ traci.start(sumoCmd)
 links = traci.trafficlight.getControlledLinks(config.TLS_ID)
 num_links = len(links)
 
-waiting_cycles = {d: 0 for d in config.DIRECTIONS}
-
 metrics = TrafficMetrics()
 csv_logger = CSVLogger()
 
+agent = QLearningAgent()
+agent.load_model()
+
+previous_state = None
+previous_action = None
+
 cycle = 0
+
 
 # =============================
 # MAIN CONTROL LOOP
 # =============================
 while cycle < 50:
 
-    # 1️⃣ Get vehicle counts
-    vehicle_counts = get_vehicle_counts(config.DIRECTIONS)
+    # =============================
+    # VEHICLE COUNT SOURCE (SUMO ONLY)
+    # =============================
+    detailed_stats = get_detailed_stats(config.DIRECTIONS)
+    vehicle_counts = {d: traci.edge.getLastStepVehicleNumber(d) for d in config.DIRECTIONS}
+    print("🟢 SUMO Counts:", vehicle_counts)
 
-    # 2️⃣ Emergency override check
+    # =============================
+    # RL STATE
+    # =============================
+    state = agent.discretize(vehicle_counts)
+
     emergency_direction = detect_emergency_vehicle(config.DIRECTIONS)
 
     if emergency_direction:
         current_direction = emergency_direction
+        action = config.DIRECTIONS.index(emergency_direction)
         print("🚨 EMERGENCY OVERRIDE ACTIVE")
     else:
-        current_direction = select_side(
-            vehicle_counts,
-            waiting_cycles,
-            config.STARVATION_THRESHOLD
-        )
+        action = agent.choose_action(state)
+        current_direction = config.DIRECTIONS[action]
 
-    vehicle_count = vehicle_counts[current_direction]
+    vehicle_count = vehicle_counts.get(current_direction, 0)
 
-    # 3️⃣ Adaptive green time
+    # =============================
+    # GREEN TIME CALCULATION
+    # =============================
     green_time = min(
         max(vehicle_count * 2, config.MIN_GREEN),
         config.MAX_GREEN
     )
 
-    # 4️⃣ Update waiting counters
-    for d in config.DIRECTIONS:
-        if d == current_direction:
-            waiting_cycles[d] = 0
-        else:
-            waiting_cycles[d] += 1
-
-    # 5️⃣ Apply GREEN phase
+    # =============================
+    # APPLY GREEN
+    # =============================
     apply_green(links, num_links, current_direction, config.TLS_ID)
 
-    # 6️⃣ Cascading red calculation
     red_times = calculate_cascading_red(
         current_direction,
         config.DIRECTIONS,
@@ -92,72 +118,72 @@ while cycle < 50:
         config.YELLOW_TIME
     )
 
-    # =============================
-    # PRINT STATUS
-    # =============================
     print("\n===================================================")
     print(f"Cycle: {cycle}")
     print(f"🟢 ACTIVE SIDE: {current_direction}")
-    print(f"Vehicles on active side: {vehicle_count}")
+    print(f"Vehicles: {vehicle_count}")
     print(f"Green: {green_time}s | Yellow: {config.YELLOW_TIME}s")
-
-    print("\nMovement Status:")
-    print(f"{current_direction} → LEFT | STRAIGHT | RIGHT = OPEN")
-
-    for side in red_times:
-        print(f"{side} → LEFT | STRAIGHT | RIGHT = STOP ({red_times[side]}s)")
-
-    # Performance metrics
-    print("\n📊 PERFORMANCE METRICS")
-    print(f"Average Waiting Time: {metrics.get_average_wait():.2f}s")
-    print(f"Throughput: {metrics.get_throughput()} vehicles")
-
     print("===================================================")
-
-    # Save CSV log
-    csv_logger.log(
-        cycle,
-        current_direction,
-        green_time,
-        config.YELLOW_TIME,
-        metrics.get_average_wait(),
-        metrics.get_throughput()
-    )
-
-    # Save live JSON for API
-    write_live_status(
-        current_direction,
-        vehicle_counts,
-        metrics.get_average_wait(),
-        metrics.get_throughput()
-    )
 
     # =============================
     # RUN GREEN PHASE
     # =============================
-    for _ in range(green_time):
+    for i in range(green_time):
+        remaining = green_time - i
+        # Refresh stats during the loop to catch new arrivals
+        current_stats = get_detailed_stats(config.DIRECTIONS)
+        write_live_status(
+            current_direction, vehicle_counts,
+            metrics.get_average_wait(), metrics.get_throughput(),
+            metrics.get_peak_wait(), metrics.get_efficiency_score(),
+            "GREEN", remaining,
+            detailed_stats=current_stats
+        )
         traci.simulationStep()
         metrics.update()
         metrics.vehicle_arrived()
-        apply_police_siren_effect()   # 🔥 Police flashing
+        apply_police_siren_effect()
+        time.sleep(1)
 
     # =============================
-    # APPLY YELLOW PHASE
+    # APPLY YELLOW
     # =============================
     apply_yellow(links, num_links, current_direction, config.TLS_ID)
 
-    for _ in range(config.YELLOW_TIME):
+    for i in range(config.YELLOW_TIME):
+        remaining = config.YELLOW_TIME - i
+        current_stats = get_detailed_stats(config.DIRECTIONS)
+        write_live_status(
+            current_direction, vehicle_counts,
+            metrics.get_average_wait(), metrics.get_throughput(),
+            metrics.get_peak_wait(), metrics.get_efficiency_score(),
+            "YELLOW", remaining,
+            detailed_stats=current_stats
+        )
         traci.simulationStep()
         metrics.update()
         metrics.vehicle_arrived()
-        apply_police_siren_effect()   # 🔥 Police flashing
+        apply_police_siren_effect()
+        time.sleep(1)
+
+    # =============================
+    # RL UPDATE
+    # =============================
+    next_state = agent.discretize(vehicle_counts)
+    reward = -metrics.get_average_wait()
+
+    if previous_state is not None:
+        agent.update(previous_state, previous_action, reward, next_state)
+
+    previous_state = state
+    previous_action = action
 
     cycle += 1
 
+
 # =============================
-# END SIMULATION
+# CLEANUP
 # =============================
 traci.close()
-
-# Plot metrics after simulation
+agent.save_model()
 plot_metrics()

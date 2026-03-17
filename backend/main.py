@@ -1,10 +1,23 @@
-from fastapi import FastAPI
-import json
-from traffic_service import TrafficService
-from fastapi.middleware.cors import CORSMiddleware
+# =============================
+# PATH FIX (VERY IMPORTANT)
+# =============================
+import sys
+import os
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
+
+# =============================
+# IMPORTS
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+import json
+
+# =============================
+# APP INITIALIZATION
+# =============================
 app = FastAPI()
-traffic_service = TrafficService()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -13,27 +26,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+CONTROLLER_STATUS_FILE = os.path.join(BASE_DIR, "controller", "live_status.json")
 
-@app.get("/")
-def root():
-    return {"message": "Smart Traffic Management API Running"}
-
-@app.post("/start")
-def start():
-    return traffic_service.start_simulation()
-
-@app.post("/stop")
-def stop():
-    return traffic_service.stop_simulation()
-
+# =============================
+# LIVE STATUS (Traffic Light + Timer)
+# =============================
 @app.get("/live-status")
 def live_status():
     try:
-        with open("../controller/live_status.json", "r") as f:
-            data = json.load(f)
-        return data
-    except:
-        return {"status": "No live data available"}
+        if os.path.exists(CONTROLLER_STATUS_FILE):
+            with open(CONTROLLER_STATUS_FILE, "r") as f:
+                data = json.load(f)
+            return data
+        else:
+            return {
+                "current_direction": None,
+                "phase": "RED",
+                "remaining_time": 0
+            }
+    except Exception as e:
+        print("Live status error:", e)
+        return {
+            "current_direction": None,
+            "phase": "RED",
+            "remaining_time": 0
+        }
 
-# backend run command
-# python -m uvicorn main:app --reload
+# =============================
+# ROOT
+# =============================
+@app.get("/")
+def root():
+    return {"message": "Smart Traffic Management API Running"}
