@@ -1,23 +1,52 @@
 import subprocess
-import threading
+import sys
+import os
+
+# Absolute path to the controller script
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONTROLLER_SCRIPT = os.path.join(BASE_DIR, "controller", "main.py")
 
 class TrafficService:
 
     def __init__(self):
         self.process = None
 
-    def start_simulation(self):
+    def _is_running(self):
+        """Check if the simulation process is alive."""
         if self.process is None:
-            self.process = subprocess.Popen(
-                ["python", "../controller/main.py"],
-                shell=True
-            )
-            return {"status": "Simulation Started"}
-        return {"status": "Already Running"}
+            return False
+        # poll() returns None if still running
+        if self.process.poll() is not None:
+            self.process = None
+            return False
+        return True
+
+    def start_simulation(self, nogui: bool = True):
+        if self._is_running():
+            return {"status": "Already Running"}
+        
+        cmd = [sys.executable, CONTROLLER_SCRIPT]
+        if nogui:
+            cmd.append("--nogui")
+            
+        self.process = subprocess.Popen(
+            cmd,
+            cwd=os.path.join(BASE_DIR, "controller")
+        )
+        return {"status": "Simulation Started", "pid": self.process.pid}
 
     def stop_simulation(self):
-        if self.process:
+        if self._is_running():
             self.process.terminate()
+            try:
+                self.process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
             self.process = None
             return {"status": "Simulation Stopped"}
         return {"status": "No Simulation Running"}
+
+    def get_status(self):
+        if self._is_running():
+            return {"status": "running", "pid": self.process.pid}
+        return {"status": "stopped"}

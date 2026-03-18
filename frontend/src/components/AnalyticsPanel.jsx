@@ -59,73 +59,75 @@ const AnalyticsPanel = ({ history, latestData }) => {
     <div className="analytics-container" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       
       {/* Summary Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "15px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "20px" }}>
         {metrics.map((m, i) => (
-          <div key={i} className="glass-panel" style={{ padding: "1rem", display: "flex", alignItems: "center", gap: "12px" }}>
-            <div style={{ backgroundColor: "rgba(255,255,255,0.05)", padding: "10px", borderRadius: "12px" }}>
+          <div key={i} className="glass-panel" style={{ padding: "1.25rem", display: "flex", alignItems: "center", gap: "15px" }}>
+            <div style={{ backgroundColor: "rgba(255,255,255,0.03)", padding: "12px", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.05)" }}>
               {m.icon}
             </div>
             <div>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase" }}>{m.label}</div>
-              <div style={{ fontSize: "1.1rem", fontWeight: "bold", color: m.color }}>{m.value}</div>
+              <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: "600", letterSpacing: "0.5px" }}>{m.label}</div>
+              <div style={{ fontSize: "1.2rem", fontWeight: "700", color: m.color, marginTop: "2px" }}>{m.value}</div>
             </div>
           </div>
         ))}
       </div>
 
       {/* Deep Charts Section */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "25px" }}>
         
         {/* Vehicle Distribution (Pie) */}
-        <div className="glass-panel" style={{ padding: "1.5rem", height: "300px" }}>
-          <h4 style={{ margin: "0 0 1rem 0", fontSize: "1rem" }}>Vehicle Distribution</h4>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={80}
-                paddingAngle={5}
-                dataKey="value"
-              >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '8px' }}
-                itemStyle={{ color: '#fff' }}
-              />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+        <div className="glass-panel">
+          <div className="card-header">
+            <h4>Vehicle Distribution</h4>
+          </div>
+          <div className="card-body" style={{ height: "260px" }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={85}
+                  paddingAngle={5}
+                  dataKey="value"
+                  stroke="none"
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip contentClassName="custom-tooltip" />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: "12px", paddingTop: "10px" }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         {/* Efficiency Trend (Bar) */}
-        <div className="glass-panel" style={{ padding: "1.5rem", height: "300px" }}>
-          <h4 style={{ margin: "0 0 1rem 0", fontSize: "1rem" }}>Efficiency Trend</h4>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={history.slice(-10)} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
-              <XAxis dataKey="time" hide />
-              <YAxis stroke="#94a3b8" fontSize={10} domain={[0, 100]} tickCount={6} />
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '8px' }}
-                itemStyle={{ color: '#fff' }}
-              />
-              <Bar 
-                dataKey="efficiency" 
-                fill="#10b981" 
-                radius={[4, 4, 0, 0]} 
-                isAnimationActive={false} 
-                minPointSize={10}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="glass-panel">
+          <div className="card-header">
+            <h4>Efficiency Trend</h4>
+          </div>
+          <div className="card-body" style={{ height: "260px" }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={history.slice(-10)} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis dataKey="time" hide />
+                <YAxis stroke="#64748b" fontSize={10} domain={[0, 100]} tickCount={6} axisLine={false} tickLine={false} />
+                <Tooltip contentClassName="custom-tooltip" />
+                <Bar 
+                  dataKey="efficiency" 
+                  fill="var(--color-green)" 
+                  radius={[6, 6, 0, 0]} 
+                  isAnimationActive={false} 
+                  minPointSize={10}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-
       </div>
 
     </div>

@@ -1,7 +1,7 @@
 import React from "react";
-import { Clock, Car } from "lucide-react";
+import { Clock, Car, Activity } from "lucide-react";
 
-const LaneBox = ({ name, short, activeLane, seconds, phase, vehicleCount }) => {
+const LaneBox = ({ name, short, activeLane, seconds, phase, vehicleCount, isNextUp, isEmergency, speed }) => {
 
   const isActive = short === activeLane;
 
@@ -9,8 +9,8 @@ const LaneBox = ({ name, short, activeLane, seconds, phase, vehicleCount }) => {
     if (!isActive) {
       return color === "red" ? "active-red dimmed" : "dimmed";
     }
-    if (phase === "GREEN" && color === "green") return "active-green pulse";
-    if (phase === "YELLOW" && color === "yellow") return "active-yellow pulse";
+    if (phase === "GREEN" && color === "green") return "active-green glow-pulse";
+    if (phase === "YELLOW" && color === "yellow") return "active-yellow glow-pulse";
     if (phase === "RED" && color === "red") return "active-red";
     return "dimmed";
   };
@@ -43,6 +43,8 @@ const LaneBox = ({ name, short, activeLane, seconds, phase, vehicleCount }) => {
       <div style={{ display: "flex", justifyContent: "space-between", width: "100%", marginBottom: "0.5rem" }}>
         <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: "600", color: isActive ? "var(--text-main)" : "var(--text-muted)" }}>{name}</h3>
         {isActive && <div style={{ color: phase === "GREEN" ? "var(--color-green)" : "var(--color-red)", fontSize: "0.7rem", fontWeight: "bold" }}>ACTIVE</div>}
+        {!isActive && isEmergency && <div style={{ color: "var(--color-red)", fontSize: "0.7rem", fontWeight: "bold", animation: "glow-pulse 1s infinite alternate" }}>🚨 EMERGENCY</div>}
+        {!isActive && !isEmergency && isNextUp && <div style={{ color: "var(--color-blue)", fontSize: "0.7rem", fontWeight: "bold" }}>NEXT UP</div>}
       </div>
 
       {/* 🚦 Traffic Light Body */}
@@ -66,12 +68,19 @@ const LaneBox = ({ name, short, activeLane, seconds, phase, vehicleCount }) => {
           marginTop: "1rem", 
           display: "flex", 
           justifyContent: "space-between",
+          alignItems: "center",
           width: "100%",
           padding: "0 5px"
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "5px", color: "var(--color-accent)" }}>
-          <Car size={16} />
-          <span style={{ fontWeight: "bold" }}>{vehicleCount}</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "5px", color: "var(--color-accent)" }}>
+              <Car size={16} />
+              <span style={{ fontWeight: "bold" }}>{vehicleCount}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "5px", color: "var(--text-muted)" }}>
+              <Activity size={16} />
+              <span style={{ fontWeight: "bold", fontSize: "0.85rem" }}>{(speed || 0).toFixed(1)} m/s</span>
+            </div>
         </div>
         
         <div style={{ 

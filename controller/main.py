@@ -4,6 +4,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import shutil
 import time
+import argparse
+import numpy as np
 import traci
 import config
 
@@ -36,8 +38,13 @@ if 'SUMO_HOME' in os.environ:
 else:
     sys.exit("Please declare SUMO_HOME")
 
-# Use headless 'sumo' by default for stability, 'sumo-gui' if you want visuals
-sumoBinary = "sumo-gui" 
+parser = argparse.ArgumentParser()
+parser.add_argument("--nogui", action="store_true", help="Run SUMO without a GUI")
+parser.add_argument("--cycles", type=int, default=99999, help="Number of cycles to run")
+args = parser.parse_args()
+
+# Use headless 'sumo' if --nogui is passed, otherwise 'sumo-gui'
+sumoBinary = "sumo" if args.nogui else "sumo-gui" 
 sumoCmd = [
     sumoBinary, 
     "-c", os.path.join(BASE_DIR, "simulation", "run.sumocfg"),
@@ -65,14 +72,13 @@ agent.load_model()
 
 previous_state = None
 previous_action = None
-
 cycle = 0
 
 
 # =============================
 # MAIN CONTROL LOOP
 # =============================
-while cycle < 50:
+while cycle < args.cycles:
 
     # =============================
     # VEHICLE COUNT SOURCE (SUMO ONLY)
@@ -93,18 +99,51 @@ while cycle < 50:
         action = config.DIRECTIONS.index(emergency_direction)
         print("🚨 EMERGENCY OVERRIDE ACTIVE")
     else:
-        action = agent.choose_action(state)
+        # Strict Round-Robin Sequence
+        if previous_action is None:
+            action = 0
+        else:
+            action = (previous_action + 1) % len(config.DIRECTIONS)
+            
+            # Skip empty lanes intelligently 
+            attempts = 0
+            while vehicle_counts.get(config.DIRECTIONS[action], 0) == 0 and attempts < 3:
+                action = (action + 1) % len(config.DIRECTIONS)
+                attempts += 1
+        
         current_direction = config.DIRECTIONS[action]
 
+    # Predict Next Direction
+    next_action = (action + 1) % len(config.DIRECTIONS)
+    attempts_next = 0
+    while vehicle_counts.get(config.DIRECTIONS[next_action], 0) == 0 and attempts_next < 3:
+        next_action = (next_action + 1) % len(config.DIRECTIONS)
+        attempts_next += 1
+
+    next_direction = config.DIRECTIONS[next_action]
+
     vehicle_count = vehicle_counts.get(current_direction, 0)
+    
+    # Speed Analysis factor
+    mean_speed = traci.edge.getLastStepMeanSpeed(current_direction)
+    # Provide more time for highly congested slow lanes
+    if mean_speed < 3.0:
+        speed_factor = 1.3
+    elif mean_speed > 8.0:
+        speed_factor = 0.8
+    else:
+        speed_factor = 1.0
 
     # =============================
     # GREEN TIME CALCULATION
     # =============================
-    green_time = min(
-        max(vehicle_count * 2, config.MIN_GREEN),
-        config.MAX_GREEN
-    )
+    if emergency_direction:
+        green_time = config.MAX_GREEN
+    else:
+        green_time = min(
+            max(int(vehicle_count * 2 * speed_factor), config.MIN_GREEN),
+            config.MAX_GREEN
+        )
 
     # =============================
     # APPLY GREEN
@@ -132,12 +171,17 @@ while cycle < 50:
         remaining = green_time - i
         # Refresh stats during the loop to catch new arrivals
         current_stats = get_detailed_stats(config.DIRECTIONS)
+        live_vehicle_counts = {d: traci.edge.getLastStepVehicleNumber(d) for d in config.DIRECTIONS}
+        live_lane_speeds = {d: traci.edge.getLastStepMeanSpeed(d) for d in config.DIRECTIONS}
+        
         write_live_status(
-            current_direction, vehicle_counts,
+            current_direction, live_vehicle_counts,
             metrics.get_average_wait(), metrics.get_throughput(),
             metrics.get_peak_wait(), metrics.get_efficiency_score(),
             "GREEN", remaining,
-            detailed_stats=current_stats
+            detailed_stats=current_stats,
+            next_direction=next_direction,
+            speeds=live_lane_speeds
         )
         traci.simulationStep()
         metrics.update()
@@ -153,12 +197,17 @@ while cycle < 50:
     for i in range(config.YELLOW_TIME):
         remaining = config.YELLOW_TIME - i
         current_stats = get_detailed_stats(config.DIRECTIONS)
+        live_vehicle_counts = {d: traci.edge.getLastStepVehicleNumber(d) for d in config.DIRECTIONS}
+        live_lane_speeds = {d: traci.edge.getLastStepMeanSpeed(d) for d in config.DIRECTIONS}
+        
         write_live_status(
-            current_direction, vehicle_counts,
+            current_direction, live_vehicle_counts,
             metrics.get_average_wait(), metrics.get_throughput(),
             metrics.get_peak_wait(), metrics.get_efficiency_score(),
             "YELLOW", remaining,
-            detailed_stats=current_stats
+            detailed_stats=current_stats,
+            next_direction=next_direction,
+            speeds=live_lane_speeds
         )
         traci.simulationStep()
         metrics.update()

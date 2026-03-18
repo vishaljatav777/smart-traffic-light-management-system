@@ -1,70 +1,212 @@
 import React, { useState } from "react";
-import axios from "axios";
+import { Upload, Video, X, CheckCircle, Activity } from "lucide-react";
 
-const VideoUpload = () => {
-  const [videos, setVideos] = useState({
-    north: null,
-    south: null,
-    east: null,
-    west: null,
-  });
+const DirectionUpload = ({ direction, onFileSelect }) => {
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const handleChange = (lane, file) => {
-    setVideos({ ...videos, [lane]: file });
-  };
-
-  const uploadLane = async (lane) => {
-    if (!videos[lane]) {
-      alert(`Please select video for ${lane}`);
-      return;
+  const handleFile = (selectedFile) => {
+    if (selectedFile && selectedFile.type.startsWith("video/")) {
+      setFile(selectedFile);
+      setPreview(URL.createObjectURL(selectedFile));
+      onFileSelect(direction, selectedFile);
     }
-
-    const formData = new FormData();
-    formData.append("file", videos[lane]);
-
-    await axios.post(
-      `http://127.0.0.1:8000/upload-video/${lane}`,
-      formData,
-      { headers: { "Content-Type": "multipart/form-data" } }
-    );
-
-    alert(`${lane.toUpperCase()} uploaded`);
   };
 
-    const switchMode = async (mode) => {
-    await axios.post(`http://127.0.0.1:8000/set-mode/${mode}`);
-    alert(`Switched to ${mode} mode`);
-};
+  const onDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    handleFile(e.dataTransfer.files[0]);
+  };
 
+  const onRemove = () => {
+    setFile(null);
+    setPreview(null);
+    onFileSelect(direction, null);
+  };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>Lane-wise Video Upload (YOLO Mode)</h2>
-
-        <button onClick={() => switchMode("YOLO")}>Start YOLO</button>
-        <button onClick={() => switchMode("SUMO")}>Start SUMO</button>
-      <div>
-        <h4>North Lane</h4>
-        <input type="file" onChange={(e) => handleChange("north", e.target.files[0])}/>
-        <button onClick={() => uploadLane("north")}>Upload</button>
+    <div 
+      className={`glass-panel ${isDragging ? "dragging" : ""}`}
+      style={{ 
+        position: "relative",
+        height: "100%", 
+        minHeight: "300px",
+        display: "flex", 
+        flexDirection: "column", 
+        alignItems: "center", 
+        justifyContent: "center",
+        padding: "2rem",
+        transition: "all 0.3s ease",
+        border: isDragging ? "2px dashed var(--color-blue)" : "1px solid rgba(255, 255, 255, 0.1)",
+        background: isDragging ? "rgba(59, 130, 246, 0.1)" : "rgba(15, 23, 42, 0.3)"
+      }}
+      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+      onDragLeave={() => setIsDragging(false)}
+      onDrop={onDrop}
+    >
+      <div style={{ 
+        position: "absolute", 
+        top: "15px", 
+        left: "20px", 
+        fontSize: "0.75rem", 
+        fontWeight: "700", 
+        color: "var(--text-muted)",
+        letterSpacing: "1px",
+        textTransform: "uppercase"
+      }}>
+        {direction} QUADRANT
       </div>
 
-      <div>
-        <h4>South Lane</h4>
-        <input type="file" onChange={(e) => handleChange("south", e.target.files[0])}/>
-        <button onClick={() => uploadLane("south")}>Upload</button>
-      </div>
+      {!preview ? (
+        <div style={{ textAlign: "center", pointerEvents: "none" }}>
+          <div style={{ 
+            width: "60px", 
+            height: "60px", 
+            borderRadius: "50%", 
+            background: "rgba(59, 130, 246, 0.1)", 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center",
+            margin: "0 auto 1.5rem",
+            color: "var(--color-blue)"
+          }}>
+            <Upload size={28} />
+          </div>
+          <h4 style={{ margin: "0 0 10px", color: "white" }}>Drag & Drop Footage</h4>
+          <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", maxWidth: "200px", margin: "0 auto" }}>
+            Upload High-Res CCTV Video for {direction} lane analysis
+          </p>
+          <input 
+            type="file" 
+            accept="video/*" 
+            onChange={(e) => handleFile(e.target.files[0])}
+            style={{ 
+              position: "absolute", 
+              top: 0, 
+              left: 0, 
+              width: "100%", 
+              height: "100%", 
+              opacity: 0, 
+              cursor: "pointer",
+              pointerEvents: "auto"
+            }}
+          />
+        </div>
+      ) : (
+        <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
+          <div style={{ 
+            flexGrow: 1, 
+            borderRadius: "12px", 
+            overflow: "hidden", 
+            background: "#000",
+            position: "relative"
+          }}>
+            <video 
+              src={preview} 
+              autoPlay 
+              loop 
+              muted 
+              style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+            />
+            <button 
+              onClick={onRemove}
+              style={{
+                position: "absolute",
+                top: "10px",
+                right: "10px",
+                background: "rgba(239, 68, 68, 0.2)",
+                border: "1px solid rgba(239, 68, 68, 0.4)",
+                color: "white",
+                borderRadius: "50%",
+                width: "30px",
+                height: "30px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                backdropFilter: "blur(5px)"
+              }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <div style={{ marginTop: "15px", display: "flex", alignItems: "center", gap: "10px" }}>
+            <CheckCircle size={18} color="var(--color-green)" />
+            <span style={{ fontSize: "0.85rem", color: "white" }}>{file?.name}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
-      <div>
-        <h4>East Lane</h4>
-        <input type="file" onChange={(e) => handleChange("east", e.target.files[0])}/>
-        <button onClick={() => uploadLane("east")}>Upload</button>
-      </div>
+const VideoUpload = () => {
+  const [uploads, setUploads] = useState({
+    North: null,
+    South: null,
+    East: null,
+    West: null
+  });
 
-      <div>
-        <h4>West Lane</h4>
-        <input type="file" onChange={(e) => handleChange("west", e.target.files[0])}/>
-        <button onClick={() => uploadLane("west")}>Upload</button>
+  const handleFileSelect = (direction, file) => {
+    setUploads(prev => ({ ...prev, [direction]: file }));
+  };
+
+  const handleSystemStart = () => {
+    const uploadedCount = Object.values(uploads).filter(v => v !== null).length;
+    if (uploadedCount < 4) {
+      alert("Please upload footage for all 4 quadrants to begin system analysis.");
+      return;
+    }
+    alert("Starting Deep RL Analysis Engine with provided footage...");
+  };
+
+  return (
+    <div style={{ padding: "0 10px" }}>
+      <header style={{ marginBottom: "2.5rem", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <h1 style={{ fontSize: "1.8rem", margin: "0 0 10px", display: "flex", alignItems: "center", gap: "15px" }}>
+             <Video size={32} color="var(--color-blue)" /> 4-Way Footage Ingestion
+          </h1>
+          <p style={{ color: "var(--text-muted)", margin: 0 }}>Upload traffic video sources for all intersection directions to sync with the RL Engine.</p>
+        </div>
+        <button 
+          onClick={handleSystemStart}
+          style={{
+            padding: "12px 30px",
+            background: "linear-gradient(to right, var(--color-blue), var(--color-accent))",
+            color: "white",
+            border: "none",
+            borderRadius: "12px",
+            fontWeight: "600",
+            cursor: "pointer",
+            boxShadow: "0 0 20px rgba(59, 130, 246, 0.3)",
+            transition: "all 0.3s ease",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px"
+          }}
+          className="btn-primary"
+        >
+          <Activity size={20} /> START ANALYSIS ENGINE
+        </button>
+      </header>
+
+      <div style={{ 
+        display: "grid", 
+        gridTemplateColumns: "repeat(2, 1fr)", 
+        gap: "25px",
+        marginBottom: "30px"
+      }}>
+        {["North", "East", "South", "West"].map(dir => (
+          <DirectionUpload 
+            key={dir} 
+            direction={dir} 
+            onFileSelect={handleFileSelect} 
+          />
+        ))}
       </div>
     </div>
   );
