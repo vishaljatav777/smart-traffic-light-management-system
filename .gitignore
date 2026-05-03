@@ -1,10 +1,46 @@
+# ===================================================
+# LARGE FILES — never commit these to GitHub
+# ===================================================
+# Video files (any size — GitHub limit is 100 MB)
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.wmv
+*.flv
+*.webm
+*.m4v
+*.mpg
+*.mpeg
+
+# YOLO / ML model weights (hundreds of MB each)
+*.weights
+*.h5
+*.pt
+*.pth
+*.onnx
+*.pb
+*.tflite
+*.pkl
+
+# Datasets / large archives
+*.zip
+*.tar.gz
+*.tar
+*.7z
+*.rar
+*.csv.gz
+
+# ===================================================
 # Logs
+# ===================================================
 logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
