@@ -6,6 +6,7 @@ const Dashboard = ({ liveData }) => {
   const [activeLane, setActiveLane] = useState("N");
   const [phase, setPhase] = useState("RED");
   const [seconds, setSeconds] = useState(0);
+  const [currentMode, setCurrentMode] = useState("MOCK");
 
   useEffect(() => {
     if (liveData) {
@@ -18,19 +19,57 @@ const Dashboard = ({ liveData }) => {
     }
   }, [liveData]);
 
+  // Poll current data source mode from backend
+  useEffect(() => {
+    const fetchMode = () => {
+      fetch("http://127.0.0.1:8000/simulation/current-mode")
+        .then(r => r.json())
+        .then(d => setCurrentMode(d.mode || "MOCK"))
+        .catch(() => {});
+    };
+    fetchMode();
+    const interval = setInterval(fetchMode, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   if (!liveData) return <div className="glass-panel p-6">Connecting to Traffic Controller...</div>;
+
+  const isVideoMode = currentMode === "VIDEO";
+  const laneSignals = liveData.lane_signals || {};
+
+  // Map direction ID → short letter for each lane
+  const laneConfig = [
+    { name: "North", short: "N", id: "N_J1" },
+    { name: "East",  short: "E", id: "E_J1" },
+    { name: "West",  short: "W", id: "W_J1" },
+    { name: "South", short: "S", id: "S_J1" },
+  ];
 
   return (
     <div className="dashboard-content" style={{ display: "flex", flexDirection: "column", gap: "25px" }}>
+
+      {/* 🎥 Video Mode Banner */}
+      {isVideoMode && (
+        <div style={{
+          padding: "12px 20px",
+          borderRadius: "12px",
+          background: "rgba(245,158,11,0.1)",
+          border: "1px solid rgba(245,158,11,0.3)",
+          display: "flex", alignItems: "center", gap: "12px",
+          fontSize: "0.85rem", color: "#f59e0b", fontWeight: "600"
+        }}>
+          <span style={{ fontSize: "1.1rem" }}>🎥</span>
+          VIDEO MODE ACTIVE — YOLO detection running on uploaded footage · Green lane plays, red lanes pause
+        </div>
+      )}
+
       {/* 🚨 Emergency Alert Banner */}
       {liveData?.detailed_stats?.emergency_detected && (
-        <div className="glass-panel" style={{ 
-          padding: "1.25rem 1.5rem", 
+        <div className="glass-panel" style={{
+          padding: "1.25rem 1.5rem",
           backgroundColor: "rgba(239, 68, 68, 0.15)",
           border: "1px solid var(--color-red)",
-          display: "flex",
-          alignItems: "center",
-          gap: "20px",
+          display: "flex", alignItems: "center", gap: "20px",
           animation: "glow-pulse 1s infinite alternate"
         }}>
           <div style={{ backgroundColor: "var(--color-red)", padding: "12px", borderRadius: "50%", boxShadow: "0 0 20px rgba(239, 68, 68, 0.4)" }}>
@@ -52,46 +91,48 @@ const Dashboard = ({ liveData }) => {
         <div className="card-header">
           <h2>🚦 Live Traffic Monitor</h2>
           <div style={{ display: "flex", gap: "25px", alignItems: "center" }}>
-             <div style={{ textAlign: "right", paddingRight: "15px", borderRight: "1px solid rgba(255,255,255,0.1)" }}>
-               <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: "600", textTransform: "uppercase", letterSpacing: "1px" }}>NEXT LANE</div>
-               <div style={{ 
-                 fontWeight: "700", 
-                 fontSize: "1.1rem",
-                 color: "var(--color-blue)"
-               }}>{liveData.next_direction ? liveData.next_direction.split("_")[0] : "--"}</div>
-             </div>
-             <div style={{ textAlign: "right" }}>
-               <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: "600", textTransform: "uppercase", letterSpacing: "1px" }}>CURRENT PHASE</div>
-               <div style={{ 
-                 fontWeight: "700", 
-                 fontSize: "1.1rem",
-                 color: phase === "GREEN" ? "var(--color-green)" : phase === "YELLOW" ? "var(--color-yellow)" : "var(--color-red)" 
-               }}>{phase}</div>
-             </div>
-             <div style={{ 
-               fontSize: "2.8rem", 
-               fontWeight: "700", 
-               fontFamily: "'Roboto Mono', monospace",
-               color: "var(--color-accent)",
-               minWidth: "70px",
-               textAlign: "center",
-               textShadow: "0 0 20px rgba(99, 102, 241, 0.3)"
-             }}>
-               {seconds}s
-             </div>
+            <div style={{ textAlign: "right", paddingRight: "15px", borderRight: "1px solid rgba(255,255,255,0.1)" }}>
+              <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: "600", textTransform: "uppercase", letterSpacing: "1px" }}>NEXT LANE</div>
+              <div style={{ fontWeight: "700", fontSize: "1.1rem", color: "var(--color-blue)" }}>
+                {liveData.next_direction ? liveData.next_direction.split("_")[0] : "--"}
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: "600", textTransform: "uppercase", letterSpacing: "1px" }}>CURRENT PHASE</div>
+              <div style={{
+                fontWeight: "700", fontSize: "1.1rem",
+                color: phase === "GREEN" ? "var(--color-green)" : phase === "YELLOW" ? "var(--color-yellow)" : "var(--color-red)"
+              }}>{phase}</div>
+            </div>
+            <div style={{
+              fontSize: "2.8rem", fontWeight: "700",
+              fontFamily: "'Roboto Mono', monospace", color: "var(--color-accent)",
+              minWidth: "70px", textAlign: "center",
+              textShadow: "0 0 20px rgba(99, 102, 241, 0.3)"
+            }}>
+              {seconds}s
+            </div>
           </div>
         </div>
-        
+
         <div className="card-body">
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "24px"
-          }}>
-            <LaneBox name="North" short="N" activeLane={activeLane} phase={phase} seconds={seconds} vehicleCount={liveData.vehicle_counts?.N_J1 || 0} isNextUp={liveData.next_direction === "N_J1"} isEmergency={liveData.detailed_stats?.emergency_direction === "N_J1"} speed={liveData.speeds?.N_J1 || 0} />
-            <LaneBox name="East" short="E" activeLane={activeLane} phase={phase} seconds={seconds} vehicleCount={liveData.vehicle_counts?.E_J1 || 0} isNextUp={liveData.next_direction === "E_J1"} isEmergency={liveData.detailed_stats?.emergency_direction === "E_J1"} speed={liveData.speeds?.E_J1 || 0} />
-            <LaneBox name="West" short="W" activeLane={activeLane} phase={phase} seconds={seconds} vehicleCount={liveData.vehicle_counts?.W_J1 || 0} isNextUp={liveData.next_direction === "W_J1"} isEmergency={liveData.detailed_stats?.emergency_direction === "W_J1"} speed={liveData.speeds?.W_J1 || 0} />
-            <LaneBox name="South" short="S" activeLane={activeLane} phase={phase} seconds={seconds} vehicleCount={liveData.vehicle_counts?.S_J1 || 0} isNextUp={liveData.next_direction === "S_J1"} isEmergency={liveData.detailed_stats?.emergency_direction === "S_J1"} speed={liveData.speeds?.S_J1 || 0} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+            {laneConfig.map(lane => (
+              <LaneBox
+                key={lane.id}
+                name={lane.name}
+                short={lane.short}
+                activeLane={activeLane}
+                phase={phase}
+                seconds={seconds}
+                vehicleCount={liveData.vehicle_counts?.[lane.id] || 0}
+                isNextUp={liveData.next_direction === lane.id}
+                isEmergency={liveData.detailed_stats?.emergency_direction === lane.id}
+                speed={liveData.speeds?.[lane.id] || 0}
+                laneSignal={laneSignals[lane.id]}
+                isVideoMode={isVideoMode}
+              />
+            ))}
           </div>
         </div>
       </div>

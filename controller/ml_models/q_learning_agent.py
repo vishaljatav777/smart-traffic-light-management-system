@@ -53,6 +53,10 @@ class QLearningAgent:
             self.q_table[state][action]
         )
 
+        # FIX #9: Epsilon decay — agent explores less as it gains experience
+        # Floor at 0.05 so it never stops exploring completely
+        self.epsilon = max(0.05, self.epsilon * 0.999)
+
     def save_model(self, filename=MODEL_PATH):
         with open(filename, "wb") as f:
             pickle.dump(self.q_table, f)

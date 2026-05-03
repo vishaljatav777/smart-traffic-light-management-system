@@ -51,7 +51,8 @@ def _get_cctv_data() -> Tuple[Dict[str, int], Dict[str, float]]:
 # ---------------------------------------------------------------------------
 # MOCK DATA SOURCE — Realistic random counts so the agent always has data
 # ---------------------------------------------------------------------------
-_mock_counts = {lane: random.randint(3, 12) for lane in ["N_J1", "E_J1", "S_J1", "W_J1"]}
+# FIX #8: Use config.DIRECTIONS so mock data always matches the configured lanes
+_mock_counts = {lane: random.randint(3, 12) for lane in config.DIRECTIONS}
 
 def _get_mock_data() -> Tuple[Dict[str, int], Dict[str, float]]:
     """Simulate realistic traffic data with gradual random drift per cycle."""

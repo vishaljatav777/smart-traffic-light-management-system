@@ -42,12 +42,21 @@ CONTROLLER_STATUS_FILE = os.path.join(BASE_DIR, "controller", "live_status.json"
 # Singleton service handling the SUMO controller subprocess
 traffic_service = TrafficService()
 
+# FIX #1: Defined here (top-level, before ANY endpoint) so all routes can safely reference it
+_current_mode = {"source": "MOCK"}
+
 # =============================
 # SIMULATION CONTROL
 # =============================
 @app.post("/simulation/start")
-def start_simulation(nogui: bool = Query(default=True, description="Run SUMO without GUI")):
-    return traffic_service.start_simulation(nogui=nogui)
+def start_simulation(
+    nogui: bool = Query(default=True, description="Run SUMO without GUI"),
+    mode: str = Query(default="MOCK", description="Data source mode: MOCK, SUMO, or VIDEO")
+):
+    # FIX #3: Update _current_mode so /simulation/current-mode returns correct value
+    mode = mode.upper()
+    _current_mode["source"] = mode
+    return traffic_service.start_simulation(nogui=nogui, data_source=mode)
 
 @app.post("/simulation/stop")
 def stop_simulation():
@@ -121,12 +130,15 @@ async def start_analysis(
     # 🛑 Stop existing simulation if running
     traffic_service.stop_simulation()
     
-    # 🚀 Start simulation in VIDEO mode (GUI enabled for visualization)
+    # 🚀 Start simulation in VIDEO mode — nogui=True (YOLO uses OpenCV window, not SUMO GUI)
     result = traffic_service.start_simulation(
-        nogui=False, 
+        nogui=True, 
         data_source="VIDEO", 
         video_paths=video_paths
     )
+
+    # Update current mode tracker so /simulation/current-mode returns VIDEO
+    _current_mode["source"] = "VIDEO"
     
     return {
         "status": "success",
@@ -142,8 +154,7 @@ def analysis_status():
 # =============================
 # DATA SOURCE SWITCHER
 # =============================
-# Tracks what mode the controller is currently running in
-_current_mode = {"source": "MOCK"}
+# NOTE: _current_mode is defined at module-level above (line ~44) — do NOT redefine here
 
 @app.get("/simulation/current-mode")
 def get_current_mode():

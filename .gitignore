@@ -46,6 +46,11 @@ uploads/
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
 
+# Python
+__pycache__/
+*.py[cod]
+*.tmp
+
 # TypeScript cache
 *.tsbuildinfo
 

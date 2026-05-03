@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Settings, Save, RefreshCcw, ShieldCheck, Power, SlidersHorizontal, BellRing, Play, Zap, Radio, Video } from "lucide-react";
+import VideoModeModal from "./VideoModeModal";
 
 const SettingsPage = () => {
     const [settings, setSettings] = useState({
@@ -16,6 +17,7 @@ const SettingsPage = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [activeMode, setActiveMode] = useState("MOCK");
     const [switchingMode, setSwitchingMode] = useState(null);
+    const [showVideoModal, setShowVideoModal] = useState(false);
 
     useEffect(() => {
         const checkStatus = async () => {
@@ -74,6 +76,13 @@ const SettingsPage = () => {
 
     const handleSwitchMode = async (targetMode) => {
         if (targetMode === activeMode) return;
+
+        // VIDEO mode opens the upload modal first — don't switch directly
+        if (targetMode === "VIDEO") {
+            setShowVideoModal(true);
+            return;
+        }
+
         setSwitchingMode(targetMode);
         try {
             const res = await fetch(
@@ -91,6 +100,13 @@ const SettingsPage = () => {
             alert("Error switching mode: " + error.message);
         }
         setSwitchingMode(null);
+    };
+
+    // Called when VideoModeModal successfully starts analysis
+    const handleVideoSuccess = () => {
+        setShowVideoModal(false);
+        setActiveMode("VIDEO");
+        setSimulationStatus("running");
     };
 
     // Mode definitions
@@ -119,7 +135,7 @@ const SettingsPage = () => {
             id: "VIDEO",
             label: "VIDEO",
             subtitle: "CCTV / Footage",
-            description: "Process uploaded traffic video with YOLOv4 detection. Upload footage via 'Upload Footage' page first.",
+            description: "Opens the 4-lane footage upload wizard. YOLO detects vehicles per frame and controls signals in real-time.",
             icon: <Video size={22} />,
             color: "#f59e0b",      // amber
             bg: "rgba(245, 158, 11, 0.12)",
@@ -128,6 +144,15 @@ const SettingsPage = () => {
     ];
 
     return (
+        <>
+        {/* Video Mode Upload Modal */}
+        {showVideoModal && (
+            <VideoModeModal
+                onClose={() => setShowVideoModal(false)}
+                onSuccess={handleVideoSuccess}
+            />
+        )}
+
         <div className="settings-page" style={{ display: "flex", flexDirection: "column", gap: "25px" }}>
             <header>
                 <h2 style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -343,7 +368,9 @@ const SettingsPage = () => {
                 </div>
             </div>
         </div>
+        </>
     );
 };
+
 
 export default SettingsPage;

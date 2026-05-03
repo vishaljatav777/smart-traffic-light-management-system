@@ -1,13 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+// FIX #12: Recharts imports moved to DashboardView below (not root App level)
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 
 // Components
@@ -62,6 +57,8 @@ function App() {
   const [data, setData] = useState(null);
   const [history, setHistory] = useState([]);
   const [isEngineRunning, setIsEngineRunning] = useState(false);
+  // FIX #4: inline stop toast instead of alert()
+  const [stopToast, setStopToast] = useState("");
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -88,7 +85,7 @@ function App() {
           });
         })
         .catch(err => {
-          console.log(err);
+          console.error("[LiveStatus] fetch failed:", err); // FIX #5
           setIsEngineRunning(false);
         });
     }, 1000);
@@ -100,10 +97,14 @@ function App() {
     try {
       const resp = await fetch("http://127.0.0.1:8000/simulation/stop", { method: "POST" });
       if (resp.ok) {
-        alert("Traffic Engine Stopped successfully.");
+        // FIX #4: no more alert() — show inline toast instead
+        setStopToast("Engine stopped.");
+        setTimeout(() => setStopToast(""), 3000);
       }
     } catch (err) {
       console.error("Stop error:", err);
+      setStopToast("Failed to stop engine.");
+      setTimeout(() => setStopToast(""), 3000);
     }
   };
 
@@ -112,6 +113,20 @@ function App() {
     <Router>
       <div className="app-layout">
         <Navbar onStop={stopEngine} isRunning={isEngineRunning} />
+        {/* FIX #4: inline stop toast — never blocks the UI */}
+        {stopToast && (
+          <div style={{
+            position: "fixed", bottom: "24px", right: "24px", zIndex: 9998,
+            padding: "12px 22px", borderRadius: "12px", fontWeight: "600", fontSize: "0.88rem",
+            background: stopToast.includes("Failed") ? "rgba(239,68,68,0.15)" : "rgba(16,185,129,0.15)",
+            border: `1px solid ${stopToast.includes("Failed") ? "rgba(239,68,68,0.4)" : "rgba(16,185,129,0.4)"}`,
+            color: stopToast.includes("Failed") ? "#ef4444" : "#10b981",
+            backdropFilter: "blur(10px)",
+            boxShadow: "0 8px 30px rgba(0,0,0,0.4)"
+          }}>
+            {stopToast.includes("Failed") ? "❌" : "✅"} {stopToast}
+          </div>
+        )}
         
         <main className="main-content">
 
