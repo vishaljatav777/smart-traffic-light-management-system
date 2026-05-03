@@ -1,6 +1,7 @@
-import traci
+# FIX #11: traci imported lazily inside functions only — safe in non-SUMO mode
 
 def apply_green(links, num_links, current_direction, tls_id):
+    import traci
     state = []
 
     for i in range(num_links):
@@ -13,11 +14,18 @@ def apply_green(links, num_links, current_direction, tls_id):
         else:
             state.append("r")
 
+    if not state or not tls_id:
+        return
+
     green_state = "".join(state)
-    traci.trafficlight.setRedYellowGreenState(tls_id, green_state)
+    try:
+        traci.trafficlight.setRedYellowGreenState(tls_id, green_state)
+    except Exception as e:
+        print(f"[TRACI ERROR] Failed to set green state: {e}")
 
 
 def apply_yellow(links, num_links, current_direction, tls_id):
+    import traci
     state = []
 
     for i in range(num_links):
@@ -30,5 +38,11 @@ def apply_yellow(links, num_links, current_direction, tls_id):
         else:
             state.append("r")
 
+    if not state or not tls_id:
+        return
+
     yellow_state = "".join(state)
-    traci.trafficlight.setRedYellowGreenState(tls_id, yellow_state)
+    try:
+        traci.trafficlight.setRedYellowGreenState(tls_id, yellow_state)
+    except Exception as e:
+        print(f"[TRACI ERROR] Failed to set yellow state: {e}")

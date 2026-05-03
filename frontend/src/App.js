@@ -61,6 +61,7 @@ const DashboardView = ({ data, history }) => (
 function App() {
   const [data, setData] = useState(null);
   const [history, setHistory] = useState([]);
+  const [isEngineRunning, setIsEngineRunning] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -68,6 +69,8 @@ function App() {
         .then(res => res.json())
         .then(newData => {
           setData(newData);
+          // FIX #8: Only show "Running" when real traffic data is present
+          setIsEngineRunning(newData.current_direction !== null && newData.current_direction !== undefined);
           setHistory(prev => {
             const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' });
             return [
@@ -84,17 +87,31 @@ function App() {
             ];
           });
         })
-        .catch(err => console.log(err));
+        .catch(err => {
+          console.log(err);
+          setIsEngineRunning(false);
+        });
     }, 1000);
 
     return () => clearInterval(interval);
   }, []);
 
+  const stopEngine = async () => {
+    try {
+      const resp = await fetch("http://127.0.0.1:8000/simulation/stop", { method: "POST" });
+      if (resp.ok) {
+        alert("Traffic Engine Stopped successfully.");
+      }
+    } catch (err) {
+      console.error("Stop error:", err);
+    }
+  };
+
 
   return (
     <Router>
       <div className="app-layout">
-        <Navbar />
+        <Navbar onStop={stopEngine} isRunning={isEngineRunning} />
         
         <main className="main-content">
 
@@ -104,7 +121,7 @@ function App() {
             <Route path="/analytics" element={<AnalysisPage history={history} />} />
             <Route path="/heatmap" element={<HeatmapView latestData={data} />} />
             <Route path="/ml-logs" element={<MLDatabase latestData={data} />} />
-            <Route path="/upload" element={<VideoUpload />} />
+            <Route path="/upload" element={<VideoUpload onStop={stopEngine} />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<DashboardView data={data} history={history} />} />
           </Routes>

@@ -3,22 +3,42 @@ import cv2
 import numpy as np
 
 # =============================
-# LOAD YOLOv4-Tiny MODEL
+# MODEL PATHS
 # =============================
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 weights_path = os.path.join(BASE_DIR, "yolo", "yolov4-tiny.weights")
-config_path = os.path.join(BASE_DIR, "yolo", "yolov4-tiny.cfg")
-names_path = os.path.join(BASE_DIR, "yolo", "coco.names")
+config_path  = os.path.join(BASE_DIR, "yolo", "yolov4-tiny.cfg")
+names_path   = os.path.join(BASE_DIR, "yolo", "coco.names")
 
-net = cv2.dnn.readNet(weights_path, config_path)
+# FIX #4: Lazy-load the YOLO model — only loaded when first detect_vehicles() call is made,
+# NOT at import time. This prevents a multi-second startup block and avoids crashes
+# if yolo_detection is imported in MOCK mode where the weights are never actually needed.
+_net = None
+_classes = None
+_output_layers = None
 
-with open(names_path, "r") as f:
-    classes = [line.strip() for line in f.readlines()]
+def _load_model():
+    global _net, _classes, _output_layers
+    if _net is not None:
+        return  # Already loaded
 
-layer_names = net.getLayerNames()
-output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
+    if not os.path.exists(weights_path):
+        raise FileNotFoundError(f"[YOLO] Weights file not found: {weights_path}")
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"[YOLO] Config file not found: {config_path}")
+    if not os.path.exists(names_path):
+        raise FileNotFoundError(f"[YOLO] Names file not found: {names_path}")
+
+    print("[YOLO] Loading model... (first-time only)")
+    _net = cv2.dnn.readNet(weights_path, config_path)
+
+    with open(names_path, "r") as f:
+        _classes = [line.strip() for line in f.readlines()]
+
+    layer_names = _net.getLayerNames()
+    _output_layers = [layer_names[i - 1] for i in _net.getUnconnectedOutLayers()]
+    print("[YOLO] Model loaded successfully.")
 
 # Vehicle classes we care about
 VEHICLE_CLASSES = ["car", "truck", "bus", "motorbike"]
@@ -28,6 +48,8 @@ VEHICLE_CLASSES = ["car", "truck", "bus", "motorbike"]
 # DETECTION FUNCTION
 # =============================
 def detect_vehicles(frame, draw_boxes=False, lane_mode=False):
+    # Load model on first call
+    _load_model()
 
     height, width, _ = frame.shape
 
@@ -40,8 +62,8 @@ def detect_vehicles(frame, draw_boxes=False, lane_mode=False):
         crop=False,
     )
 
-    net.setInput(blob)
-    outs = net.forward(output_layers)
+    _net.setInput(blob)
+    outs = _net.forward(_output_layers)
 
     # If lane_mode → return single integer
     if lane_mode:
@@ -56,7 +78,7 @@ def detect_vehicles(frame, draw_boxes=False, lane_mode=False):
             confidence = scores[class_id]
 
             if confidence > 0.5:
-                label = classes[class_id]
+                label = _classes[class_id]
 
                 if label in VEHICLE_CLASSES:
 
@@ -114,7 +136,7 @@ if __name__ == "__main__":
 
     cap = cv2.VideoCapture("traffic.mp4")
 
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     cv2.namedWindow("YOLO Traffic Detection", cv2.WINDOW_NORMAL)
@@ -155,4 +177,3 @@ if __name__ == "__main__":
 
     cap.release()
     cv2.destroyAllWindows()
-    

@@ -1,0 +1,23 @@
+# Smart Traffic Light Management System — Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# Backend (FastAPI)
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+
+# Controller & Analytics
+numpy>=1.24.0
+opencv-python>=4.8.0
+matplotlib>=3.7.0
+
+# SUMO TraCI (optional — only needed for SUMO simulation mode)
+# traci is included with SUMO installation. If installed standalone:
+# traci>=1.17.0
+
+# ML / Serialization (stdlib — no install needed)
+# pickle — built-in
+
+# Video Processing (included with opencv-python)
+# cv2 — included
+
+# Frontend managed separately via npm (see frontend/package.json)

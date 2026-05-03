@@ -6,7 +6,7 @@ import {
   Upload
 } from "lucide-react";
 
-const Navbar = () => {
+const Navbar = (props) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -72,15 +72,46 @@ const Navbar = () => {
           alignItems: "center", 
           gap: "8px", 
           fontSize: "0.7rem", 
-          color: "var(--color-green)",
-          backgroundColor: "rgba(16, 185, 129, 0.1)",
+          color: props.isRunning ? "var(--color-green)" : "var(--text-muted)",
+          backgroundColor: props.isRunning ? "rgba(16, 185, 129, 0.1)" : "rgba(156, 163, 175, 0.1)",
           padding: "6px 12px",
           borderRadius: "20px",
-          border: "1px solid rgba(16, 185, 129, 0.2)"
+          border: props.isRunning ? "1px solid rgba(16, 185, 129, 0.2)" : "1px solid rgba(156, 163, 175, 0.2)"
         }}>
-          <div style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "var(--color-green)", animation: "glow-pulse 1s infinite alternate" }}></div>
-          ENGINE LIVE
+          <div style={{ 
+            width: "6px", 
+            height: "6px", 
+            borderRadius: "50%", 
+            backgroundColor: props.isRunning ? "var(--color-green)" : "var(--text-muted)", 
+            animation: props.isRunning ? "glow-pulse 1s infinite alternate" : "none" 
+          }}></div>
+          {props.isRunning ? "ENGINE LIVE" : "ENGINE STOPPED"}
         </div>
+        
+        {props.isRunning && (
+          <button 
+            onClick={props.onStop}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              fontSize: "0.75rem",
+              color: "#fff",
+              backgroundColor: "rgba(239, 68, 68, 0.2)",
+              padding: "8px 16px",
+              borderRadius: "12px",
+              border: "1px solid rgba(239, 68, 68, 0.3)",
+              cursor: "pointer",
+              fontWeight: "600",
+              transition: "all 0.3s ease",
+              animation: "pulse-subtle 2s infinite"
+            }}
+            onMouseOver={(e) => e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.4)"}
+            onMouseOut={(e) => e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.2)"}
+          >
+            🛑 STOP ENGINE
+          </button>
+        )}
       </div>
 
       {/* Mobile Overlay */}

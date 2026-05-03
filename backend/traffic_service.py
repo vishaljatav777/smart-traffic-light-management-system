@@ -21,17 +21,24 @@ class TrafficService:
             return False
         return True
 
-    def start_simulation(self, nogui: bool = True):
+    def start_simulation(self, nogui: bool = True, data_source: str = "MOCK", video_paths: dict = None):
         if self._is_running():
             return {"status": "Already Running"}
         
+        env = os.environ.copy()
+        env["DATA_SOURCE"] = data_source
+        if video_paths:
+            import json
+            env["VIDEO_PATHS"] = json.dumps(video_paths)
+            
         cmd = [sys.executable, CONTROLLER_SCRIPT]
         if nogui:
             cmd.append("--nogui")
             
         self.process = subprocess.Popen(
             cmd,
-            cwd=os.path.join(BASE_DIR, "controller")
+            cwd=os.path.join(BASE_DIR, "controller"),
+            env=env
         )
         return {"status": "Simulation Started", "pid": self.process.pid}
 

@@ -142,25 +142,58 @@ const DirectionUpload = ({ direction, onFileSelect }) => {
   );
 };
 
-const VideoUpload = () => {
+const VideoUpload = ({ onStop }) => {
   const [uploads, setUploads] = useState({
     North: null,
     South: null,
     East: null,
     West: null
   });
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState(null);
 
   const handleFileSelect = (direction, file) => {
     setUploads(prev => ({ ...prev, [direction]: file }));
   };
 
-  const handleSystemStart = () => {
+  const handleSystemStart = async () => {
     const uploadedCount = Object.values(uploads).filter(v => v !== null).length;
     if (uploadedCount < 4) {
       alert("Please upload footage for all 4 quadrants to begin system analysis.");
       return;
     }
-    alert("Starting Deep RL Analysis Engine with provided footage...");
+
+    setIsUploading(true);
+    setUploadStatus("Initialising Deep RL Analysis Engine...");
+
+    const formData = new FormData();
+    formData.append("north", uploads.North);
+    formData.append("south", uploads.South);
+    formData.append("east", uploads.East);
+    formData.append("west", uploads.West);
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/analysis/start", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setUploadStatus("Success! Analysis Engine is now processing footage.");
+        setTimeout(() => {
+          window.location.href = "/"; // Redirect to dashboard
+        }, 2000);
+      } else {
+        throw new Error(result.message || "Upload failed");
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert("Error starting analysis engine: " + error.message);
+      setIsUploading(false);
+      setUploadStatus(null);
+    }
   };
 
   return (
@@ -172,27 +205,66 @@ const VideoUpload = () => {
           </h1>
           <p style={{ color: "var(--text-muted)", margin: 0 }}>Upload traffic video sources for all intersection directions to sync with the RL Engine.</p>
         </div>
-        <button 
-          onClick={handleSystemStart}
-          style={{
-            padding: "12px 30px",
-            background: "linear-gradient(to right, var(--color-blue), var(--color-accent))",
-            color: "white",
-            border: "none",
-            borderRadius: "12px",
-            fontWeight: "600",
-            cursor: "pointer",
-            boxShadow: "0 0 20px rgba(59, 130, 246, 0.3)",
-            transition: "all 0.3s ease",
-            display: "flex",
-            alignItems: "center",
-            gap: "10px"
-          }}
-          className="btn-primary"
-        >
-          <Activity size={20} /> START ANALYSIS ENGINE
-        </button>
+        <div style={{ display: "flex", gap: "15px" }}>
+          {isUploading && (
+            <button 
+              onClick={onStop}
+              style={{
+                padding: "12px 25px",
+                background: "rgba(239, 68, 68, 0.15)",
+                color: "var(--color-red)",
+                border: "1px solid rgba(239, 68, 68, 0.3)",
+                borderRadius: "12px",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "all 0.3s ease"
+              }}
+            >
+              STOP ANALYSIS
+            </button>
+          )}
+          <button 
+            onClick={handleSystemStart}
+            disabled={isUploading}
+            style={{
+              padding: "12px 30px",
+              background: isUploading 
+                ? "rgba(59, 130, 246, 0.4)" 
+                : "linear-gradient(to right, var(--color-blue), var(--color-accent))",
+              color: isUploading ? "rgba(255,255,255,0.5)" : "black",
+              border: "none",
+              borderRadius: "12px",
+              fontWeight: "600",
+              cursor: isUploading ? "not-allowed" : "pointer",
+              boxShadow: isUploading ? "none" : "0 0 20px rgba(59, 130, 246, 0.3)",
+              transition: "all 0.3s ease",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px"
+            }}
+            className={isUploading ? "" : "btn-primary"}
+          >
+            {isUploading ? <Activity className="animate-pulse" size={20} /> : <Activity size={20} />}
+            {isUploading ? "STARTING ENGINE..." : "START ANALYSIS ENGINE"}
+          </button>
+        </div>
       </header>
+
+      {uploadStatus && (
+        <div style={{
+          marginBottom: "20px",
+          padding: "15px",
+          borderRadius: "10px",
+          backgroundColor: "rgba(59, 130, 246, 0.1)",
+          border: "1px solid rgba(59, 130, 246, 0.3)",
+          color: "var(--color-blue)",
+          textAlign: "center",
+          fontWeight: "600",
+          fontSize: "0.9rem"
+        }}>
+          {uploadStatus}
+        </div>
+      )}
 
       <div style={{ 
         display: "grid", 
