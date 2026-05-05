@@ -178,6 +178,12 @@ body {
   justify-content: center;
 }
 
+.nav-link-horizontal:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  transform: translateY(-2px);
+}
+
+
 /* Base Mobile Nav States (Hidden on Desktop) */
 .mobile-nav-menu, .mobile-menu-btn {
   display: none !important;

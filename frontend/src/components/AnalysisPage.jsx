@@ -2,11 +2,20 @@ import React from "react";
 import { 
   LineChart, Line, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
-  ResponsiveContainer 
+  ResponsiveContainer,
+  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from "recharts";
-import { Activity, BarChart3, Database, Zap } from "lucide-react";
+import { Activity, BarChart3, Database, Zap, Compass } from "lucide-react";
 
 const AnalysisPage = ({ history }) => {
+  const latestCounts = history.length > 0 ? history[history.length - 1].counts : {};
+  const radarData = [
+    { subject: 'North', A: latestCounts['N_J1'] || 0, fullMark: 25 },
+    { subject: 'East', A: latestCounts['E_J1'] || 0, fullMark: 25 },
+    { subject: 'South', A: latestCounts['S_J1'] || 0, fullMark: 25 },
+    { subject: 'West', A: latestCounts['W_J1'] || 0, fullMark: 25 },
+  ];
+
   return (
     <div className="analysis-page" style={{ display: "flex", flexDirection: "column", gap: "25px" }}>
       <header>
@@ -41,7 +50,7 @@ const AnalysisPage = ({ history }) => {
           </ResponsiveContainer>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "25px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "25px" }}>
           {/* Wait Time vs Throughput */}
           <div className="glass-panel" style={{ padding: "1.5rem", height: "350px" }}>
              <h4 style={{ marginBottom: "1rem", display: "flex", alignItems: "center", gap: "8px" }}>
@@ -58,6 +67,22 @@ const AnalysisPage = ({ history }) => {
                    <Line yAxisId="left" type="monotone" dataKey="wait" stroke="#ef4444" strokeWidth={2} dot={false} name="Avg Wait (s)" />
                    <Line yAxisId="right" type="monotone" dataKey="throughput" stroke="#3b82f6" strokeWidth={2} dot={false} name="Total Arrived" />
                 </LineChart>
+             </ResponsiveContainer>
+          </div>
+
+          {/* Lane Traffic Intensity Radar */}
+          <div className="glass-panel" style={{ padding: "1.5rem", height: "350px" }}>
+             <h4 style={{ marginBottom: "1rem", display: "flex", alignItems: "center", gap: "8px" }}>
+                <Compass size={16} color="#8b5cf6" /> Lane Traffic Intensity
+             </h4>
+             <ResponsiveContainer width="100%" height="100%">
+                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
+                  <PolarGrid stroke="rgba(255,255,255,0.1)" />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                  <PolarRadiusAxis angle={30} domain={[0, 25]} tick={false} axisLine={false} />
+                  <Radar name="Vehicles" dataKey="A" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.4} />
+                  <Tooltip contentStyle={{ backgroundColor: '#020617', border: '1px solid var(--glass-border)' }} />
+                </RadarChart>
              </ResponsiveContainer>
           </div>
 

@@ -54,19 +54,30 @@ def _get_cctv_data() -> Tuple[Dict[str, int], Dict[str, float]]:
 # FIX #8: Use config.DIRECTIONS so mock data always matches the configured lanes
 _mock_counts = {lane: random.randint(3, 12) for lane in config.DIRECTIONS}
 
-def _get_mock_data() -> Tuple[Dict[str, int], Dict[str, float]]:
+def _get_mock_data(active_direction: str = None) -> Tuple[Dict[str, int], Dict[str, float]]:
     """Simulate realistic traffic data with gradual random drift per cycle."""
     vehicle_counts = {}
     speeds = {}
     for lane in config.DIRECTIONS:
-        # Drift the count ±1 to ±3 each cycle, clamped between 0 and 25
-        drift = random.randint(-3, 3)
-        _mock_counts[lane] = max(0, min(25, _mock_counts.get(lane, 5) + drift))
+        if lane == active_direction:
+            # Releasing cars: reduce count rapidly since light is green
+            _mock_counts[lane] = max(0, _mock_counts.get(lane, 0) - random.randint(1, 3))
+        else:
+            # Build up traffic on red lights
+            drift = random.randint(-1, 2)
+            prev = _mock_counts.get(lane, 6)
+            # Add a small chance for a surge or drop to simulate real traffic spikes
+            if random.random() < 0.05:
+                drift += random.choice([-2, 4])
+            _mock_counts[lane] = max(0, min(25, prev + drift))
+            
         vehicle_counts[lane] = _mock_counts[lane]
-        # Speed inversely proportional to congestion
-        speeds[lane] = max(2.0, 15.0 - vehicle_counts[lane] * 0.5)
+        # Speed inversely proportional to congestion, but always between 2.0 and 12.0
+        speeds[lane] = max(2.0, min(12.0, 14.0 - vehicle_counts[lane] * 0.5))
 
-    print(f"[MOCK DATA] Counts: { {k: v for k, v in vehicle_counts.items()} }")
+    print("[MOCK DATA] --- Vehicle Counts & Speeds ---")
+    for lane in config.DIRECTIONS:
+        print(f"  Lane {lane}: count={vehicle_counts[lane]}, speed={speeds[lane]:.2f}")
     return vehicle_counts, speeds
 
 def _get_video_data() -> Tuple[Dict[str, int], Dict[str, float]]:
@@ -131,7 +142,7 @@ def _get_video_data() -> Tuple[Dict[str, int], Dict[str, float]]:
             
     return vehicle_counts, speeds
 
-def get_traffic_data() -> Tuple[Dict[str, int], Dict[str, float]]:
+def get_traffic_data(active_direction: str = None) -> Tuple[Dict[str, int], Dict[str, float]]:
     """Return vehicle counts and speeds based on the selected DATA_SOURCE."""
     source = getattr(config, "DATA_SOURCE", "MOCK")
     if source == "SUMO":
@@ -146,9 +157,9 @@ def get_traffic_data() -> Tuple[Dict[str, int], Dict[str, float]]:
         )
         if not has_videos:
             print("[WARNING] VIDEO mode selected but no valid video paths found. Falling back to MOCK.")
-            return _get_mock_data()
+            return _get_mock_data(active_direction)
         return _get_video_data()
     elif source == "MOCK":
-        return _get_mock_data()
+        return _get_mock_data(active_direction)
     else:
         raise ValueError(f"Unsupported DATA_SOURCE: {source}")

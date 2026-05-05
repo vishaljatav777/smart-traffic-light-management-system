@@ -2,14 +2,16 @@ import React from "react";
 import { Database, Cpu, BrainCircuit, ListChecks, ArrowRightCircle } from "lucide-react";
 
 const MLDatabase = ({ latestData }) => {
-  // Mock Q-learning decisions based on live data
-  const recentDecisions = [
-    { time: "22:45:01", state: "N_HEAVY", action: "EXTEND_NORTH", reward: "+12.5", efficiency: "88%" },
-    { time: "22:45:15", state: "E_CLEAR", action: "SWITCH_SOUTH", reward: "-2.1", efficiency: "85%" },
-    { time: "22:45:30", state: "W_EMERGENCY", action: "FORCE_WEST", reward: "+50.0", efficiency: "92%" },
-    { time: "22:45:45", state: "ALL_BUSY", action: "ROUND_ROBIN", reward: "+5.2", efficiency: "86%" },
-    { time: "22:46:00", state: "S_HEAVY", action: "EXTEND_SOUTH", reward: "+8.9", efficiency: "89%" }
-  ];
+  const recentDecisions = latestData?.recent_decisions || [];
+  const agentInfo = latestData?.agent_info || {
+    lr: "0.001",
+    gamma: "0.95",
+    epsilon: "0.1",
+    epsilon_decay: "0.995",
+    q_table_size: "14,582"
+  };
+
+  const isExploring = parseFloat(agentInfo.epsilon) > 0.15;
 
   return (
     <div className="ml-database-page" style={{ display: "flex", flexDirection: "column", gap: "25px" }}>
@@ -29,24 +31,24 @@ const MLDatabase = ({ latestData }) => {
              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                 <div style={{ padding: "12px", background: "rgba(255,255,255,0.02)", borderRadius: "8px" }}>
                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>LR (Learning Rate)</div>
-                   <div style={{ fontWeight: "bold" }}>0.001</div>
+                   <div style={{ fontWeight: "bold" }}>{agentInfo.lr}</div>
                 </div>
                 <div style={{ padding: "12px", background: "rgba(255,255,255,0.02)", borderRadius: "8px" }}>
                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Gamma (Discount)</div>
-                   <div style={{ fontWeight: "bold" }}>0.95</div>
+                   <div style={{ fontWeight: "bold" }}>{agentInfo.gamma}</div>
                 </div>
                 <div style={{ padding: "12px", background: "rgba(255,255,255,0.02)", borderRadius: "8px" }}>
                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Epsilon (Exploration)</div>
-                   <div style={{ fontWeight: "bold" }}>0.1</div>
+                   <div style={{ fontWeight: "bold" }}>{agentInfo.epsilon}</div>
                 </div>
                 <div style={{ padding: "12px", background: "rgba(255,255,255,0.02)", borderRadius: "8px" }}>
                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Exploration Decay</div>
-                   <div style={{ fontWeight: "bold" }}>0.995</div>
+                   <div style={{ fontWeight: "bold" }}>{agentInfo.epsilon_decay}</div>
                 </div>
              </div>
-             <div style={{ marginTop: "10px", padding: "15px", backgroundColor: "rgba(59, 130, 246, 0.1)", borderRadius: "8px", border: "1px solid rgba(59, 130, 246, 0.2)" }}>
+             <div style={{ marginTop: "10px", padding: "15px", backgroundColor: isExploring ? "rgba(245, 158, 11, 0.1)" : "rgba(59, 130, 246, 0.1)", borderRadius: "8px", border: isExploring ? "1px solid rgba(245, 158, 11, 0.2)" : "1px solid rgba(59, 130, 246, 0.2)" }}>
                 <p style={{ fontSize: "0.85rem", lineHeight: "1.4" }}>
-                   Agent is currently in <strong>EXPLOITATION</strong> mode. Prioritizing actions with highest predicted Q-values based on historical traffic patterns.
+                   Agent is currently in <strong>{isExploring ? "EXPLORATION" : "EXPLOITATION"}</strong> mode. {isExploring ? "Discovering new policies by taking random actions." : "Prioritizing actions with highest predicted Q-values based on historical traffic patterns."}
                 </p>
              </div>
           </div>
@@ -60,8 +62,20 @@ const MLDatabase = ({ latestData }) => {
                 <h4 style={{ margin: 0 }}>Q-Table Database</h4>
                 <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "5px" }}>Stored in <code>controller/ml_models/q_table.pkl</code></p>
              </div>
-             <div style={{ fontSize: "1.2rem", fontWeight: "bold" }}>14,582 <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Unique States Maped</span></div>
-             <button style={{ backgroundColor: "var(--color-blue)", color: "white", border: "none", padding: "10px 20px", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }}>
+             <div style={{ fontSize: "1.2rem", fontWeight: "bold" }}>{agentInfo.q_table_size} <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Unique States Maped</span></div>
+             <button 
+               onClick={async () => {
+                 if(window.confirm("Are you sure you want to flush the Q-Table? The agent will lose all training data.")) {
+                   try {
+                     const res = await fetch("http://127.0.0.1:8000/simulation/flush-model", { method: "POST" });
+                     const data = await res.json();
+                     alert(data.message);
+                   } catch (e) {
+                     alert("Failed to flush model.");
+                   }
+                 }
+               }}
+               style={{ backgroundColor: "var(--color-blue)", color: "white", border: "none", padding: "10px 20px", borderRadius: "8px", cursor: "pointer", fontWeight: "600" }}>
                 FLUSH & RETRAIN MODEL
              </button>
           </div>

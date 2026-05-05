@@ -1,0 +1,54 @@
+# 🚦 Smart Traffic Light Management System - Project Overview
+
+Here is a comprehensive breakdown of your project. You can use this guide to confidently explain the architecture, workflow, and AI logic to your mentor.
+
+## 1. The Big Picture (Elevator Pitch)
+"My project is an **AI-powered Smart Traffic Management System**. It replaces traditional, fixed-timer traffic lights with a self-learning system that adapts to real-time traffic conditions. It uses **Computer Vision (YOLOv4)** to count vehicles from camera feeds and a **Reinforcement Learning (Q-Learning) AI agent** to dynamically decide the optimal green light duration for each lane. Everything is monitored and controlled through a **live, real-time web dashboard**."
+
+---
+
+## 2. System Architecture (The 3 Main Pillars)
+Your project is built on a modern, decoupled architecture, meaning the different parts communicate with each other seamlessly:
+
+*   **Frontend (React.js):** A premium, glassmorphism dashboard running on port 3000. It shows live traffic light animations, countdown timers, vehicle counts, and analytics graphs. It polls the backend every second to stay updated.
+*   **Backend (FastAPI/Python):** Running on port 8000, this acts as the bridge. It exposes REST API endpoints (like `/live-status` and `/switch-mode`) for the frontend to consume, and manages the underlying Python controller.
+*   **Core Controller & AI (Python):** This is the brain of the system. It runs in a continuous loop in the background, calculating phases, collecting traffic data, and querying the AI agent for decisions.
+
+---
+
+## 3. How the System Gets Data (3 Modes)
+The system is highly flexible and can run in three different modes depending on the data source. You can switch between these live from the dashboard:
+
+1.  **MOCK Mode:** Generates simulated, randomized vehicle traffic. This is great for testing the UI, system stability, and core loop without external dependencies.
+2.  **SUMO Mode:** Integrates with **SUMO (Simulation of Urban MObility)**, a professional open-source traffic simulation software. It connects via the TraCI API to manage a fully simulated city intersection.
+3.  **VIDEO Mode (Computer Vision):** The most realistic mode. Users upload 4 CCTV video feeds (one for each lane). The system uses **YOLOv4-Tiny** to process the frames in real-time, detect vehicles, and send the exact vehicle counts to the AI agent.
+
+---
+
+## 4. How the AI Works (Q-Learning Agent)
+Instead of hardcoding rules (e.g., "if >10 cars, green for 30s"), your system uses a **Reinforcement Learning** approach:
+
+*   **State:** The AI looks at the intersection and discretizes the traffic in all 4 lanes into levels (Low, Medium, High).
+*   **Action:** It decides which lane should get the green light next.
+*   **Reward:** The goal of the AI is to minimize congestion. It calculates a "reward" based on the negative average waiting time. The lower the waiting time, the higher the reward.
+*   **Learning:** Using the **Bellman Equation**, it updates its "Q-Table" (its memory of what actions worked best in what states). It starts by exploring randomly, but over time, it learns the optimal traffic flow patterns. The Q-Table is saved to disk (`q_table.pkl`) so the AI remembers its training across system restarts.
+
+---
+
+## 5. The Working Process (Step-by-Step Cycle)
+When you explain the live workflow to your mentor, describe this loop which happens continuously:
+
+1.  **Observation:** The system checks the current vehicle counts from the active data source (MOCK, SUMO, or VIDEO/YOLO).
+2.  **Decision Making:** The AI agent analyzes the traffic state and decides which lane gets the green light.
+3.  **Phase Calculation:** The system calculates the exact green time needed based on the number of vehicles (clamped between a `MIN_GREEN` and `MAX_GREEN` time).
+4.  **Signal Execution:** The controller applies the lights (Green -> Yellow -> Red transitions).
+5.  **Dashboard Update:** The system writes the new state to an atomic JSON file (`live_status`), which the FastAPI backend reads and sends to the React dashboard instantly.
+6.  **AI Feedback:** The cycle finishes, the AI checks if its decision reduced waiting time, updates its Q-Table with the reward, and the loop repeats.
+
+---
+
+## 6. Key Features to Highlight
+Make sure to mention these advanced features to impress your mentor:
+*   **Emergency Vehicle Override:** The system can detect siren patterns or emergency vehicles, immediately force other lanes to red, and give maximum green time to the priority lane.
+*   **Live Analytics:** The dashboard calculates throughput and efficiency metrics in real-time, displaying them on beautiful graphs (Wait times, Throughput over 20 cycles).
+*   **Continuous Learning:** Emphasize that the AI doesn't start from scratch every time; it saves its Q-table state, making it a true continuous learning system.

@@ -1,9 +1,8 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
-  LayoutDashboard, Video, Settings, 
-  Database, Activity, Map,
-  Upload
+  LayoutDashboard, Settings, 
+  Database, Activity, Map
 } from "lucide-react";
 
 const Navbar = (props) => {
@@ -12,8 +11,6 @@ const Navbar = (props) => {
 
   const menuItems = [
     { name: "Live Dashboard", icon: <LayoutDashboard size={18} />, path: "/" },
-    { name: "Live CCTV Feed", icon: <Video size={18} />, path: "/cctv" },
-    { name: "Upload Footage", icon: <Upload size={18} />, path: "/upload" },
     { name: "Traffic Analysis", icon: <Activity size={18} />, path: "/analytics" },
     { name: "Heatmap View", icon: <Map size={18} />, path: "/heatmap" },
     { name: "ML Database", icon: <Database size={18} />, path: "/ml-logs" },

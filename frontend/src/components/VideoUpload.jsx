@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Upload, Video, X, CheckCircle, Activity } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const DirectionUpload = ({ direction, onFileSelect }) => {
   const [file, setFile] = useState(null);
@@ -143,6 +144,7 @@ const DirectionUpload = ({ direction, onFileSelect }) => {
 };
 
 const VideoUpload = ({ onStop }) => {
+  const navigate = useNavigate();
   const [uploads, setUploads] = useState({
     North: null,
     South: null,
@@ -183,7 +185,7 @@ const VideoUpload = ({ onStop }) => {
       if (response.ok) {
         setUploadStatus("Success! Analysis Engine is now processing footage.");
         setTimeout(() => {
-          window.location.href = "/"; // Redirect to dashboard
+          navigate("/"); // Redirect to dashboard smoothly
         }, 2000);
       } else {
         throw new Error(result.message || "Upload failed");

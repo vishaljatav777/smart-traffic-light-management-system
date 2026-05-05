@@ -9,12 +9,10 @@ import {
 import Dashboard from "./components/Dashboard";
 import AnalyticsPanel from "./components/AnalyticsPanel";
 import Navbar from "./components/Navbar";
-import CCTVPanel from "./components/CCTVPanel";
 import AnalysisPage from "./components/AnalysisPage";
 import HeatmapView from "./components/HeatmapView";
 import MLDatabase from "./components/MLDatabase";
 import SettingsPage from "./components/SettingsPage";
-import VideoUpload from "./components/VideoUpload";
 
 const DashboardView = ({ data, history }) => (
   <div className="dashboard-grid" style={{ 
@@ -57,6 +55,7 @@ function App() {
   const [data, setData] = useState(null);
   const [history, setHistory] = useState([]);
   const [isEngineRunning, setIsEngineRunning] = useState(false);
+  const missedHeartbeats = React.useRef(0); // FIX: tolerance counter
   // FIX #4: inline stop toast instead of alert()
   const [stopToast, setStopToast] = useState("");
 
@@ -66,8 +65,16 @@ function App() {
         .then(res => res.json())
         .then(newData => {
           setData(newData);
-          // FIX #8: Only show "Running" when real traffic data is present
-          setIsEngineRunning(newData.current_direction !== null && newData.current_direction !== undefined);
+          const isRunning = newData.current_direction !== null && newData.current_direction !== undefined;
+          
+          if (isRunning) {
+            missedHeartbeats.current = 0;
+            setIsEngineRunning(true);
+          } else {
+            missedHeartbeats.current += 1;
+            if (missedHeartbeats.current >= 3) setIsEngineRunning(false);
+          }
+
           setHistory(prev => {
             const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' });
             return [
@@ -86,7 +93,8 @@ function App() {
         })
         .catch(err => {
           console.error("[LiveStatus] fetch failed:", err); // FIX #5
-          setIsEngineRunning(false);
+          missedHeartbeats.current += 1;
+          if (missedHeartbeats.current >= 3) setIsEngineRunning(false);
         });
     }, 1000);
 
@@ -132,11 +140,9 @@ function App() {
 
           <Routes>
             <Route path="/" element={<DashboardView data={data} history={history} />} />
-            <Route path="/cctv" element={<CCTVPanel />} />
             <Route path="/analytics" element={<AnalysisPage history={history} />} />
             <Route path="/heatmap" element={<HeatmapView latestData={data} />} />
             <Route path="/ml-logs" element={<MLDatabase latestData={data} />} />
-            <Route path="/upload" element={<VideoUpload onStop={stopEngine} />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<DashboardView data={data} history={history} />} />
           </Routes>

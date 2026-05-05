@@ -1,5 +1,20 @@
 import sys
 import os
+import socket
+
+# =============================
+# SINGLE-INSTANCE LOCK
+# =============================
+# Prevent multiple instances of main.py from running simultaneously
+# and corrupting live_status.json / q_table.pkl
+try:
+    _lock_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    _lock_socket.bind(("127.0.0.1", 60432))
+except socket.error:
+    print("[ERROR] Another instance of the Traffic Controller is already running!")
+    print("Please stop the existing instance before starting a new one.")
+    sys.exit(1)
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import time
@@ -29,10 +44,19 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 from source_selector import get_traffic_data
 
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("--nogui", action="store_true", help="Run SUMO without a GUI")
+parser.add_argument("--sumo", action="store_true", help="Force SUMO mode")
+parser.add_argument("--cycles", type=int, default=99999, help="Number of cycles to run")
+args, unknown = parser.parse_known_args()
+
 # =============================
 # ENVIRONMENT OVERRIDES
 # =============================
-if os.environ.get("DATA_SOURCE"):
+if args.sumo:
+    config.DATA_SOURCE = "SUMO"
+elif os.environ.get("DATA_SOURCE"):
     config.DATA_SOURCE = os.environ.get("DATA_SOURCE")
     print(f"[DATA SOURCE OVERRIDE] {config.DATA_SOURCE}")
 
@@ -67,11 +91,6 @@ if sumo_active:
         print("[SUMO] SUMO_HOME not set. Falling back to MOCK mode.")
         sumo_active = False
         config.DATA_SOURCE = "MOCK"
-
-parser = argparse.ArgumentParser()
-parser.add_argument("--nogui", action="store_true", help="Run SUMO without a GUI")
-parser.add_argument("--cycles", type=int, default=99999, help="Number of cycles to run")
-args = parser.parse_args()
 
 if sumo_active:
     # Use headless 'sumo' if --nogui is passed, otherwise 'sumo-gui'
@@ -164,189 +183,273 @@ agent.load_model()
 previous_state = None
 previous_action = None
 cycle = 0
+recent_decisions = []
 
 
 # =============================
 # MAIN CONTROL LOOP
 # =============================
-while cycle < args.cycles:
+try:
+    while cycle < args.cycles:
+        # Check for graceful shutdown flag
+        stop_flag_path = os.path.join(BASE_DIR, "controller", "stop.flag")
+        if os.path.exists(stop_flag_path):
+            print("[SYSTEM] Stop flag detected. Shutting down gracefully...")
+            try:
+                os.remove(stop_flag_path)
+            except Exception:
+                pass
+            break
 
-    # =============================
-    # VEHICLE COUNT SOURCE (Unified)
-    # =============================
-    vehicle_counts, lane_speeds = get_traffic_data()
-    detailed_stats = get_detailed_stats(config.DIRECTIONS)
-    print(f"[Counts]:", vehicle_counts)
+        # =============================
+        # VEHICLE COUNT SOURCE (Unified)
+        # =============================
+        vehicle_counts, lane_speeds = get_traffic_data()
+        detailed_stats = get_detailed_stats(config.DIRECTIONS)
+        print(f"[Counts]:", vehicle_counts)
 
-    # =============================
-    # RL STATE
-    # =============================
-    state = agent.discretize(vehicle_counts)
+        # =============================
+        # RL STATE
+        # =============================
+        state = agent.discretize(vehicle_counts)
 
-    emergency_direction = detect_emergency_vehicle(config.DIRECTIONS)
+        emergency_direction = detect_emergency_vehicle(config.DIRECTIONS)
 
-    if emergency_direction:
-        current_direction = emergency_direction
-        action = config.DIRECTIONS.index(emergency_direction)
-        print("[EMERGENCY OVERRIDE ACTIVE]")
-    else:
-        # FIX #6: Use Q-Learning agent's choose_action() instead of hard-coded Round-Robin
-        action = agent.choose_action(state)
+        if emergency_direction:
+            current_direction = emergency_direction
+            action = config.DIRECTIONS.index(emergency_direction)
+            print("[EMERGENCY OVERRIDE ACTIVE]")
+        else:
+            # FIX #6: Use Q-Learning agent's choose_action() instead of hard-coded Round-Robin
+            action = agent.choose_action(state)
 
-        # Skip empty lanes intelligently (max 3 attempts)
-        attempts = 0
-        while vehicle_counts.get(config.DIRECTIONS[action], 0) == 0 and attempts < 3:
-            action = (action + 1) % len(config.DIRECTIONS)
-            attempts += 1
+            # Skip empty lanes intelligently (max 3 attempts)
+            attempts = 0
+            while vehicle_counts.get(config.DIRECTIONS[action], 0) == 0 and attempts < 3:
+                action = (action + 1) % len(config.DIRECTIONS)
+                attempts += 1
 
-        current_direction = config.DIRECTIONS[action]
+            current_direction = config.DIRECTIONS[action]
 
-    # Predict Next Direction
-    next_action = (action + 1) % len(config.DIRECTIONS)
-    attempts_next = 0
-    while vehicle_counts.get(config.DIRECTIONS[next_action], 0) == 0 and attempts_next < 3:
-        next_action = (next_action + 1) % len(config.DIRECTIONS)
-        attempts_next += 1
+        # Predict Next Direction
+        next_action = (action + 1) % len(config.DIRECTIONS)
+        attempts_next = 0
+        while vehicle_counts.get(config.DIRECTIONS[next_action], 0) == 0 and attempts_next < 3:
+            next_action = (next_action + 1) % len(config.DIRECTIONS)
+            attempts_next += 1
 
-    next_direction = config.DIRECTIONS[next_action]
+        next_direction = config.DIRECTIONS[next_action]
 
-    vehicle_count = vehicle_counts.get(current_direction, 0)
+        vehicle_count = vehicle_counts.get(current_direction, 0)
 
-    # Speed Analysis factor
-    if sumo_active:
-        try:
-            mean_speed = traci.edge.getLastStepMeanSpeed(current_direction)
-            if mean_speed < 3.0:
+        # Speed Analysis factor
+        if sumo_active:
+            try:
+                mean_speed = traci.edge.getLastStepMeanSpeed(current_direction)
+                if mean_speed < 3.0:
+                    speed_factor = 1.3
+                elif mean_speed > 8.0:
+                    speed_factor = 0.8
+                else:
+                    speed_factor = 1.0
+            except Exception:
+                speed_factor = 1.0
+        else:
+            # Use lane speeds from source (MOCK/VIDEO provide speed data)
+            raw_speed = lane_speeds.get(current_direction, 5.0)
+            if raw_speed < 3.0:
                 speed_factor = 1.3
-            elif mean_speed > 8.0:
+            elif raw_speed > 8.0:
                 speed_factor = 0.8
             else:
                 speed_factor = 1.0
-        except Exception:
-            speed_factor = 1.0
-    else:
-        # Use lane speeds from source (MOCK/VIDEO provide speed data)
-        raw_speed = lane_speeds.get(current_direction, 5.0)
-        if raw_speed < 3.0:
-            speed_factor = 1.3
-        elif raw_speed > 8.0:
-            speed_factor = 0.8
+
+        # =============================
+        # GREEN TIME CALCULATION
+        # =============================
+        if emergency_direction:
+            green_time = config.MAX_GREEN
         else:
-            speed_factor = 1.0
+            green_time = min(
+                max(int(vehicle_count * 2 * speed_factor), config.MIN_GREEN),
+                config.MAX_GREEN
+            )
 
-    # =============================
-    # GREEN TIME CALCULATION
-    # =============================
-    if emergency_direction:
-        green_time = config.MAX_GREEN
+        # =============================
+        # APPLY GREEN
+        # =============================
+        if sumo_active:
+            apply_green(links, num_links, current_direction, config.TLS_ID)
+
+        red_times = calculate_cascading_red(
+            current_direction,
+            config.DIRECTIONS,
+            green_time,
+            config.YELLOW_TIME
+        )
+
+        print("\n" + "="*50)
+        print(f"Cycle: {cycle} | Mode: {config.DATA_SOURCE} | Action: {'RL-Agent' if not emergency_direction else 'EMERGENCY'}")
+        print(f"ACTIVE DIRECTION: {current_direction} (Green for {green_time}s)")
+        print(f"NEXT DIRECTION: {next_direction}")
+        print(f"Current Metrics: Avg Wait: {metrics.get_average_wait()}s | Total Thru: {metrics.get_throughput()}")
+        print("="*50)
+
+        # =============================
+        # RUN GREEN PHASE
+        # =============================
+        for i in range(green_time):
+            if os.path.exists(stop_flag_path):
+                break
+            remaining = green_time - i
+
+            # Refresh stats from unified source
+            live_vehicle_counts, live_lane_speeds = get_traffic_data(current_direction)
+            current_stats = get_detailed_stats(config.DIRECTIONS)
+
+            agent_info = {
+                "lr": agent.alpha,
+                "gamma": agent.gamma,
+                "epsilon": round(agent.epsilon, 3),
+                "epsilon_decay": 0.999,
+                "q_table_size": len(agent.q_table)
+            }
+
+            write_live_status(
+                current_direction, live_vehicle_counts,
+                metrics.get_average_wait(), metrics.get_throughput(),
+                metrics.get_peak_wait(), metrics.get_efficiency_score(),
+                "GREEN", remaining,
+                detailed_stats=current_stats,
+                next_direction=next_direction,
+                speeds=live_lane_speeds,
+                recent_decisions=recent_decisions,
+                agent_info=agent_info
+            )
+
+            if sumo_active:
+                traci.simulationStep()
+
+            metrics.update(live_vehicle_counts)
+            metrics.vehicle_arrived()
+            apply_police_siren_effect()
+            time.sleep(1)
+
+        if os.path.exists(stop_flag_path):
+            continue # will hit the check at the start of the while loop and exit
+
+        # =============================
+        # APPLY YELLOW
+        # =============================
+        if sumo_active:
+            apply_yellow(links, num_links, current_direction, config.TLS_ID)
+
+        for i in range(config.YELLOW_TIME):
+            if os.path.exists(stop_flag_path):
+                break
+            remaining = config.YELLOW_TIME - i
+            live_vehicle_counts, live_lane_speeds = get_traffic_data(current_direction)
+            current_stats = get_detailed_stats(config.DIRECTIONS)
+
+            agent_info = {
+                "lr": agent.alpha,
+                "gamma": agent.gamma,
+                "epsilon": round(agent.epsilon, 3),
+                "epsilon_decay": 0.999,
+                "q_table_size": len(agent.q_table)
+            }
+
+            write_live_status(
+                current_direction, live_vehicle_counts,
+                metrics.get_average_wait(), metrics.get_throughput(),
+                metrics.get_peak_wait(), metrics.get_efficiency_score(),
+                "YELLOW", remaining,
+                detailed_stats=current_stats,
+                next_direction=next_direction,
+                speeds=live_lane_speeds,
+                recent_decisions=recent_decisions,
+                agent_info=agent_info
+            )
+
+            if sumo_active:
+                traci.simulationStep()
+
+            metrics.update(live_vehicle_counts)
+            metrics.vehicle_arrived()
+            apply_police_siren_effect()
+            time.sleep(1)
+
+        if os.path.exists(stop_flag_path):
+            continue
+
+        # =============================
+        # RL UPDATE
+        # =============================
+        next_state = agent.discretize(vehicle_counts)
+        reward = -metrics.get_average_wait()
+
+        if previous_state is not None:
+            agent.update(previous_state, previous_action, reward, next_state)
+            
+        max_lane = max(vehicle_counts, key=vehicle_counts.get)
+        max_count = vehicle_counts[max_lane]
+        if emergency_direction:
+            state_summary = f"{emergency_direction.split('_')[0]}_EMERGENCY"
+        elif max_count > 10:
+            state_summary = f"{max_lane.split('_')[0]}_HEAVY"
+        elif max_count > 5:
+            state_summary = f"{max_lane.split('_')[0]}_MODERATE"
+        else:
+            state_summary = "ALL_CLEAR"
+
+        recent_decisions.insert(0, {
+            "time": time.strftime("%H:%M:%S"),
+            "state": state_summary,
+            "action": f"GREEN_{config.DIRECTIONS[action].split('_')[0]}",
+            "reward": f"{reward:+.1f}",
+            "efficiency": f"{metrics.get_efficiency_score()}%"
+        })
+        if len(recent_decisions) > 10:
+            recent_decisions.pop()
+
+        previous_state = state
+        previous_action = action
+
+        # FIX #2: Log each cycle to CSV so plot_metrics() has data
+        csv_logger.log(
+            cycle, current_direction, green_time, config.YELLOW_TIME,
+            metrics.get_average_wait(), metrics.get_throughput()
+        )
+
+        cycle += 1
+
+except BaseException as e:
+    if not isinstance(e, KeyboardInterrupt):
+        print(f"\n[SYSTEM] Simulation ended abruptly: {e}")
     else:
-        green_time = min(
-            max(int(vehicle_count * 2 * speed_factor), config.MIN_GREEN),
-            config.MAX_GREEN
-        )
-
-    # =============================
-    # APPLY GREEN
-    # =============================
+        print("\n[SYSTEM] KeyboardInterrupt detected. Shutting down...")
+    
     if sumo_active:
-        apply_green(links, num_links, current_direction, config.TLS_ID)
+        print("[SUMO] TraCI connection closed.")
 
-    red_times = calculate_cascading_red(
-        current_direction,
-        config.DIRECTIONS,
-        green_time,
-        config.YELLOW_TIME
-    )
-
-    print("\n" + "="*50)
-    print(f"Cycle: {cycle} | Mode: {config.DATA_SOURCE} | Action: {'RL-Agent' if not emergency_direction else 'EMERGENCY'}")
-    print(f"ACTIVE DIRECTION: {current_direction} (Green for {green_time}s)")
-    print(f"NEXT DIRECTION: {next_direction}")
-    print(f"Current Metrics: Avg Wait: {metrics.get_average_wait()}s | Total Thru: {metrics.get_throughput()}")
-    print("="*50)
-
+finally:
     # =============================
-    # RUN GREEN PHASE
+    # CLEANUP
     # =============================
-    for i in range(green_time):
-        remaining = green_time - i
-
-        # Refresh stats from unified source
-        live_vehicle_counts, live_lane_speeds = get_traffic_data()
-        current_stats = get_detailed_stats(config.DIRECTIONS)
-
-        write_live_status(
-            current_direction, live_vehicle_counts,
-            metrics.get_average_wait(), metrics.get_throughput(),
-            metrics.get_peak_wait(), metrics.get_efficiency_score(),
-            "GREEN", remaining,
-            detailed_stats=current_stats,
-            next_direction=next_direction,
-            speeds=live_lane_speeds
-        )
-
-        if sumo_active:
-            traci.simulationStep()
-
-        metrics.update()
-        metrics.vehicle_arrived()
-        apply_police_siren_effect()
-        time.sleep(1)
-
-    # =============================
-    # APPLY YELLOW
-    # =============================
+    print("[SYSTEM] Running cleanup...")
     if sumo_active:
-        apply_yellow(links, num_links, current_direction, config.TLS_ID)
+        try:
+            traci.close()
+        except Exception:
+            pass
 
-    for i in range(config.YELLOW_TIME):
-        remaining = config.YELLOW_TIME - i
-        live_vehicle_counts, live_lane_speeds = get_traffic_data()
-        current_stats = get_detailed_stats(config.DIRECTIONS)
+    agent.save_model()
 
-        write_live_status(
-            current_direction, live_vehicle_counts,
-            metrics.get_average_wait(), metrics.get_throughput(),
-            metrics.get_peak_wait(), metrics.get_efficiency_score(),
-            "YELLOW", remaining,
-            detailed_stats=current_stats,
-            next_direction=next_direction,
-            speeds=live_lane_speeds
-        )
+    try:
+        import cv2
+        cv2.destroyAllWindows()
+    except Exception:
+        pass
 
-        if sumo_active:
-            traci.simulationStep()
-
-        metrics.update()
-        metrics.vehicle_arrived()
-        apply_police_siren_effect()
-        time.sleep(1)
-
-    # =============================
-    # RL UPDATE
-    # =============================
-    next_state = agent.discretize(vehicle_counts)
-    reward = -metrics.get_average_wait()
-
-    if previous_state is not None:
-        agent.update(previous_state, previous_action, reward, next_state)
-
-    previous_state = state
-    previous_action = action
-
-    # FIX #2: Log each cycle to CSV so plot_metrics() has data
-    csv_logger.log(
-        cycle, current_direction, green_time, config.YELLOW_TIME,
-        metrics.get_average_wait(), metrics.get_throughput()
-    )
-
-    cycle += 1
-
-
-# =============================
-# CLEANUP
-# =============================
-if sumo_active:
-    traci.close()
-agent.save_model()
-plot_metrics()
+    plot_metrics()
+    print("[SYSTEM] Shutdown complete.")

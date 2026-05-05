@@ -18,9 +18,10 @@ if BASE_DIR not in sys.path:
 # =============================
 # IMPORTS
 # =============================
-from fastapi import FastAPI, Query, UploadFile, File
+from fastapi import FastAPI, Query, UploadFile, File, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 import json
+import asyncio
 
 from traffic_service import TrafficService
 
@@ -66,29 +67,45 @@ def stop_simulation():
 def simulation_status():
     return traffic_service.get_status()
 
+@app.post("/simulation/flush-model")
+def flush_model():
+    model_path = os.path.join(BASE_DIR, "controller", "ml_models", "q_table.pkl")
+    if os.path.exists(model_path):
+        try:
+            os.remove(model_path)
+            return {"status": "success", "message": "Model flushed successfully."}
+        except Exception as e:
+            return {"status": "error", "message": f"Failed to flush model: {e}"}
+    return {"status": "success", "message": "No model found to flush."}
+
 # =============================
 # LIVE STATUS (Traffic Light + Timer)
 # =============================
 @app.get("/live-status")
 def live_status():
-    try:
-        if os.path.exists(CONTROLLER_STATUS_FILE):
-            with open(CONTROLLER_STATUS_FILE, "r") as f:
-                data = json.load(f)
-            return data
-        else:
-            return {
-                "current_direction": None,
-                "phase": "RED",
-                "remaining_time": 0
-            }
-    except Exception as e:
-        print("Live status error:", e)
-        return {
-            "current_direction": None,
-            "phase": "RED",
-            "remaining_time": 0
-        }
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+            if os.path.exists(CONTROLLER_STATUS_FILE):
+                with open(CONTROLLER_STATUS_FILE, "r") as f:
+                    data = json.load(f)
+                return data
+            else:
+                return {
+                    "current_direction": None,
+                    "phase": "RED",
+                    "remaining_time": 0
+                }
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(0.05)
+            else:
+                print("Live status error after retries:", e)
+                return {
+                    "current_direction": None,
+                    "phase": "RED",
+                    "remaining_time": 0
+                }
 
 # =============================
 # ROOT
@@ -190,3 +207,21 @@ def switch_mode(mode: str = Query(..., description="Target mode: MOCK, SUMO, or 
         "controller": result
     }
 
+# =============================
+# LIVE LOG STREAMING
+# =============================
+@app.websocket("/ws/logs")
+async def websocket_logs(websocket: WebSocket):
+    await websocket.accept()
+    last_idx = 0
+    try:
+        while True:
+            logs = traffic_service.get_recent_logs()
+            if len(logs) > last_idx:
+                new_logs = logs[last_idx:]
+                for log in new_logs:
+                    await websocket.send_text(log)
+                last_idx = len(logs)
+            await asyncio.sleep(0.5)
+    except Exception as e:
+        print(f"WebSocket closed: {e}")

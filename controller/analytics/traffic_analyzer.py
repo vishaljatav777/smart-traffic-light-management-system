@@ -10,7 +10,13 @@ except ImportError:
     except ImportError:
         config = None
 
+_mock_emergency_active = False
+_mock_emergency_ticks = 0
+_mock_emergency_data = {}
+
 def get_detailed_stats(directions):
+    global _mock_emergency_active, _mock_emergency_ticks, _mock_emergency_data
+
     stats = {
         "emergency_detected": False,
         "emergency_direction": None,
@@ -25,8 +31,33 @@ def get_detailed_stats(directions):
         }
     }
 
-    # If Not using SUMO, return empty stats (YOLO handles counts separately)
+    # If Not using SUMO, return empty stats or simulate mock emergencies
     if not config or config.DATA_SOURCE != "SUMO":
+        import random
+        
+        if _mock_emergency_active:
+            _mock_emergency_ticks -= 1
+            if _mock_emergency_ticks <= 0:
+                _mock_emergency_active = False
+            else:
+                stats["emergency_detected"] = True
+                stats["emergency_direction"] = _mock_emergency_data["direction"]
+                stats["emergency_type"] = _mock_emergency_data["type"]
+                stats["types"]["emergency"] = 1
+        else:
+            # Simulate a 0.5% chance per tick of an emergency vehicle appearing
+            if random.random() < 0.005:
+                _mock_emergency_active = True
+                _mock_emergency_ticks = 15 # persists for 15 seconds
+                _mock_emergency_data = {
+                    "direction": random.choice(directions),
+                    "type": random.choice(["ambulance", "police", "firetruck"])
+                }
+                stats["emergency_detected"] = True
+                stats["emergency_direction"] = _mock_emergency_data["direction"]
+                stats["emergency_type"] = _mock_emergency_data["type"]
+                stats["types"]["emergency"] = 1
+                
         return stats
 
     import traci
