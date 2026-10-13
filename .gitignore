@@ -78,6 +78,8 @@ node_modules/
 jspm_packages/
 uploaded_videos/
 uploads/
+venv/
+.venv/
 
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
@@ -86,6 +88,12 @@ web_modules/
 __pycache__/
 *.py[cod]
 *.tmp
+
+# Generated simulation / runtime artifacts
+*.class
+controller/live_status.json
+controller/traffic_metrics.csv
+controller/*_plot.png
 
 # TypeScript cache
 *.tsbuildinfo
