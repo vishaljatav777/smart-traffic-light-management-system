@@ -25,7 +25,7 @@ const Navbar = (props) => {
           🚦
         </div>
         <div className="brand-text-content">
-          <h2 className="brand-title">SMART TRAFFIC</h2>
+          <h2 className="brand-title">SMART TRAFFICE LIGHT MANAGEMENT</h2>
           <span className="brand-subtitle">AI CONTROL v2.4</span>
         </div>
       </div>
