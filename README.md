@@ -1,197 +1,112 @@
-<div align="center">
+# Smart Traffic Light Management System
 
-# 🚦 Smart Traffic Light Management System
+An adaptive traffic signal controller and live dashboard for a four-way intersection. The Python controller combines Q-learning with traffic data from mock input, SUMO, or uploaded video analyzed with YOLOv4-Tiny.
 
-### AI-Powered Adaptive Signal Control with Real-Time Dashboard
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-REST%20API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-<br/>
+## Contents
 
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
-[![SUMO](https://img.shields.io/badge/SUMO-Simulation-F5A623?style=flat-square)](https://sumo.dlr.de)
-[![YOLOv4](https://img.shields.io/badge/YOLOv4-Detection-EF4444?style=flat-square&logo=opencv&logoColor=white)](https://github.com/AlexeyAB/darknet)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+- [About](#about)
+- [Tech stack](#tech-stack)
+- [Features](#features)
+- [Getting started](#getting-started)
+- [Run the application](#run-the-application)
+- [Configuration](#configuration)
+- [API overview](#api-overview)
+- [Project structure](#project-structure)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+- [Contact and acknowledgments](#contact-and-acknowledgments)
 
-<br/>
+## About
 
-> A full-stack intelligent traffic management system that replaces fixed-timer signals with a self-learning **Q-Learning AI agent**, supports live **YOLOv4 vehicle detection** from CCTV footage, and visualises everything on a real-time **React glassmorphism dashboard**.
+Fixed traffic-light schedules cannot respond to changing traffic demand. This project explores an adaptive alternative: a Python controller observes vehicle counts for the north, east, south, and west approaches, chooses signal phases, and updates a Q-learning table over repeated cycles. A React dashboard displays signal state and analytics, and a FastAPI service manages the controller and accepts video uploads.
 
-</div>
+The system supports three traffic input modes:
 
----
+- **MOCK** generates traffic counts for local development and demonstrations.
+- **SUMO** connects the controller to a SUMO traffic simulation through TraCI.
+- **VIDEO** analyzes uploaded lane videos with OpenCV and YOLOv4-Tiny.
 
-## 📸 System Overview
+This project is a simulation and demonstration system. It is not a certified controller for real-world traffic infrastructure.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    React Dashboard (Port 3000)               │
-│  Live Signal Monitor · Mode Switcher · Analytics · Heatmap  │
-└────────────────────────────┬────────────────────────────────┘
-                             │  HTTP polling (every 1s)
-┌────────────────────────────▼────────────────────────────────┐
-│                  FastAPI Backend (Port 8000)                  │
-│  /live-status  /switch-mode  /analysis/start  /current-mode  │
-└────────────────────────────┬────────────────────────────────┘
-                             │  subprocess + env vars
-┌────────────────────────────▼────────────────────────────────┐
-│                     Python Controller                        │
-│                                                              │
-│   ┌─────────────┐   ┌──────────────┐   ┌─────────────────┐  │
-│   │  Q-Learning │   │    Source    │   │  Live Status    │  │
-│   │    Agent    │◄──│   Selector   │   │  Writer (JSON)  │  │
-│   └──────┬──────┘   └──────┬───────┘   └─────────────────┘  │
-│          │                 │                                  │
-│      Bellman            ┌──▼──────────────────────┐          │
-│      Equation           │  SUMO · YOLOv4 · MOCK   │          │
-│                         └─────────────────────────┘          │
-└─────────────────────────────────────────────────────────────┘
-```
+## Tech stack
 
----
+- **Frontend:** React, React Router, Recharts, Lucide React, and CSS.
+- **API:** FastAPI and Uvicorn.
+- **Controller and analytics:** Python, NumPy, and Matplotlib.
+- **Vehicle detection:** OpenCV and YOLOv4-Tiny.
+- **Traffic simulation:** Eclipse SUMO and TraCI (optional).
+- **Learning and local data:** Q-learning with a pickle Q-table; JSON live status and CSV metrics.
 
-## ✨ Key Features
+## Features
 
-### 🤖 Reinforcement Learning Signal Control
-- **Q-Learning agent** learns the optimal green-phase assignment from experience
-- State = per-lane vehicle density discretised to `Low / Medium / High`
-- Reward = `-average_waiting_time` — agent minimises congestion automatically
-- **Epsilon-greedy** exploration that decays from 20% → 5% over training cycles
-- Q-table is **persisted to disk** and reloaded on every restart (continuous learning)
+- Four-approach signal control with configurable minimum and maximum green time.
+- Q-learning policy with persisted Q-table and epsilon-greedy exploration.
+- Mock traffic mode for running the dashboard without SUMO or video input.
+- SUMO mode with optional graphical simulation.
+- Four-video upload flow for YOLO vehicle detection.
+- Live signal state, vehicle counts, phase timer, and performance metrics.
+- Dashboard pages for analytics, congestion heatmap, settings, and learning data.
+- FastAPI endpoints and interactive API documentation.
 
-### 📡 Three Live Data Source Modes
-
-| Mode | How It Works | Requirements |
-|------|-------------|--------------|
-| `MOCK` | Randomised vehicle counts with realistic drift | None — works out of the box |
-| `SUMO` | Full traffic simulation connected via TraCI API | SUMO installed + `SUMO_HOME` set |
-| `VIDEO` | YOLOv4 detects vehicles frame-by-frame from uploaded CCTV footage | YOLOv4 weights file |
-
-**Switch modes live from the Settings page — no restarts needed.**
-
-### 🎥 4-Lane Video Upload Wizard
-When you switch to **VIDEO** mode, an upload modal appears automatically:
-1. Drag & drop or click to load footage for each lane (N / E / S / W)
-2. Preview plays instantly inside each upload card
-3. Click **Start YOLO Analysis** — all 4 videos are sent to the backend
-4. The dashboard immediately shows `▶ PLAYING` or `⏸ PAUSED` per lane based on the live signal
-
-### 🚨 Emergency Vehicle Override
-- Siren pattern detection automatically grants `MAX_GREEN` to the priority lane
-- Emergency banner with animated alert appears on the dashboard
-- All other lanes go immediately to red
-
-### 📊 Real-Time Dashboard
-- **Traffic light animation** per lane (Red / Yellow / Green bulbs with glow effects)
-- Live countdown timer per phase
-- Per-lane vehicle count and speed (m/s)
-- Network flow graph (avg wait + throughput over last 20 cycles)
-- Next-lane prediction indicator
-
----
-
-## 🏗️ Project Structure
-
-```
-Smart-Traffic-Light-Management/
-│
-├── 📁 backend/                      FastAPI REST API
-│   ├── main.py                      All endpoints + mode switcher
-│   └── traffic_service.py           Controller subprocess manager
-│
-├── 📁 controller/                   Core Python controller
-│   ├── main.py                      Main cycle loop (Green → Yellow → RL update)
-│   ├── config.py                    All tunable parameters
-│   ├── source_selector.py           Routes data: SUMO / VIDEO / MOCK
-│   ├── live_status_writer.py        Atomic JSON status file (no race conditions)
-│   │
-│   ├── 📁 analytics/
-│   │   ├── traffic_analyzer.py      Emergency detection + detailed lane stats
-│   │   ├── metrics.py               Wait time, throughput, efficiency tracker
-│   │   ├── csv_logger.py            Per-cycle CSV logging
-│   │   └── plot_metrics.py          Matplotlib plots saved as PNG
-│   │
-│   ├── 📁 core/
-│   │   ├── signal_controller.py     TraCI green/yellow phase application
-│   │   └── phase_manager.py         Cascading red timer calculator
-│   │
-│   └── 📁 ml_models/
-│       └── q_learning_agent.py      Q-Learning with Bellman + epsilon decay
-│
-├── 📁 frontend/                     React 18 dashboard
-│   └── src/
-│       ├── App.js                   Root app, routing, 1s polling loop
-│       ├── App.css                  Glassmorphism design system
-│       └── components/
-│           ├── Dashboard.jsx        4-lane signal monitor
-│           ├── LaneBox.jsx          Lane card (traffic light + play/pause badge)
-│           ├── Navbar.jsx           Navigation + ENGINE LIVE badge
-│           ├── SettingsPage.jsx     Mode switcher + simulation controls
-│           ├── VideoModeModal.jsx   4-lane CCTV upload wizard
-│           ├── AnalyticsPanel.jsx   Performance metrics panel
-│           ├── AnalysisPage.jsx     Traffic analysis charts
-│           ├── HeatmapView.jsx      Lane congestion heatmap
-│           ├── MLDatabase.jsx       Q-table viewer + learning logs
-│           └── CCTVPanel.jsx        Live camera feed panel
-│
-├── 📁 simulation/                   SUMO network files
-│   ├── run.sumocfg                  SUMO configuration entry point
-│   ├── network.net.xml              Road network definition
-│   ├── routes.rou.xml               Vehicle route definitions
-│   ├── nodes.nod.xml                Junction node coordinates
-│   └── edges.edg.xml                Road edge definitions
-│
-├── 📁 yolo/                         YOLOv4 model files (not committed)
-│   ├── yolov4-tiny.weights          ← Download separately (see below)
-│   ├── yolov4-tiny.cfg
-│   └── coco.names
-│
-├── yolo_detection.py                YOLO lazy-load detection engine
-├── requirements.txt                 Python dependencies
-└── .gitignore
-```
-
----
-
-## 🚀 Installation & Setup
+## Getting started
 
 ### Prerequisites
 
-| Tool | Minimum Version | Purpose |
-|------|----------------|---------|
-| Python | 3.10 | Backend + Controller |
-| Node.js | 18 | React Frontend |
-| SUMO | 1.18 | SUMO mode (optional) |
+- Python 3.10 or newer.
+- Node.js and npm (Node.js 18 or newer recommended).
+- Git.
+- For **SUMO** mode: Eclipse SUMO installed and `SUMO_HOME` set.
+- For **VIDEO** mode: YOLOv4-Tiny weights at `yolo/yolov4-tiny.weights`, plus four video files to upload. The weights file is ignored by Git and may need to be obtained separately.
 
----
+MOCK mode does not require SUMO or YOLO weights.
 
-### Step 1 — Clone the Repository
+### Installation
+
+Clone the repository and enter its directory:
 
 ```bash
 git clone https://github.com/vishaljatav777/smart-traffic-light-management-system.git
 cd smart-traffic-light-management-system
 ```
 
-### Step 2 — Python Virtual Environment
+Create and activate a Python virtual environment:
 
 ```bash
-# Create
 python -m venv venv
+```
 
-# Activate (Windows)
-venv\Scripts\activate
+Windows PowerShell:
 
-# Activate (Linux / macOS)
+```powershell
+.\venv\Scripts\Activate.ps1
+```
+
+Windows Command Prompt:
+
+```bat
+venv\Scripts\activate.bat
+```
+
+Linux or macOS:
+
+```bash
 source venv/bin/activate
 ```
 
-### Step 3 — Install Python Dependencies
+Install the Python dependencies and `psutil` (used by the backend to manage controller processes):
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+python -m pip install psutil
 ```
 
-### Step 4 — Install Frontend Dependencies
+Install the frontend dependencies:
 
 ```bash
 cd frontend
@@ -199,186 +114,145 @@ npm install
 cd ..
 ```
 
----
+No `.env` file is required for the default local setup.
 
-## ▶️ Running the System
+## Run the application
 
-Open **3 separate terminals** (all inside the project root):
+Start the API from the project root:
 
-**Terminal 1 — Backend**
 ```bash
-cd backend
-python -m uvicorn main:app --reload
-# API available at → http://127.0.0.1:8000
-# Swagger docs at  → http://127.0.0.1:8000/docs
+python -m uvicorn backend.main:app --reload
 ```
 
-**Terminal 2 — Controller**
-```bash
-cd controller
-python main.py
-# Starts in MOCK mode by default
-# Switch modes from the dashboard Settings page
-```
+Start the frontend in a second terminal:
 
-**Terminal 3 — Frontend**
 ```bash
 cd frontend
 npm start
-# Dashboard opens at → http://localhost:3000
 ```
 
----
+Open [http://localhost:3000](http://localhost:3000). The dashboard talks to the API at `http://127.0.0.1:8000`. Use the Settings page to start the controller in MOCK mode or select another source. The API manages the controller process, so a separate controller terminal is not required for the dashboard workflow.
 
-## ⚙️ Configuration
+Useful local URLs:
 
-All parameters live in `controller/config.py`:
+- Dashboard: [http://localhost:3000](http://localhost:3000)
+- API root: [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
+- Interactive API docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
-```python
-DATA_SOURCE          = "MOCK"        # MOCK | SUMO | VIDEO
-TLS_ID               = "J1"          # SUMO junction ID
-DIRECTIONS           = ["N_J1", "E_J1", "S_J1", "W_J1"]
+You can also run the controller directly from its directory for a standalone run:
 
-MIN_GREEN            = 8             # Minimum green phase (seconds)
-MAX_GREEN            = 40            # Maximum green phase (seconds)
-YELLOW_TIME          = 4             # Yellow phase duration (seconds)
-STARVATION_THRESHOLD = 3             # Cycles before forcing a starved lane
+```bash
+cd controller
+python main.py
 ```
 
----
+The direct controller run defaults to MOCK mode. Set `DATA_SOURCE=SUMO` in the process environment to request SUMO mode, or use `python main.py --sumo`. The API-driven workflow is recommended when using the dashboard.
 
-## 🔁 Switching Data Source Modes
+### Optional: SUMO setup
 
-From the dashboard: **Settings → Data Source Mode**
-
-| Click | What Happens |
-|-------|-------------|
-| ⚡ **MOCK** | Instantly switches to simulated drift traffic data |
-| 📡 **SUMO** | Stops controller, restarts with SUMO-GUI opening automatically |
-| 🎥 **VIDEO** | Opens the 4-lane CCTV footage upload wizard |
-
----
-
-## 🟡 SUMO Mode Setup
-
-> Skip this if you only need MOCK or VIDEO mode.
-
-**1. Download and install SUMO:**
-https://sumo.dlr.de/docs/Downloads.php → choose *Windows 64-bit installer*
-
-**2. Set the `SUMO_HOME` environment variable:**
+Install SUMO and set `SUMO_HOME` to its installation directory. For example, in PowerShell for the current session:
 
 ```powershell
-# Run as Administrator in PowerShell
-[System.Environment]::SetEnvironmentVariable(
-  "SUMO_HOME",
-  "C:\Program Files (x86)\Eclipse\Sumo",
-  "User"
-)
+$env:SUMO_HOME = 'C:\Program Files (x86)\Eclipse\Sumo'
 ```
 
-Restart your terminal. Verify with:
-```powershell
-echo $env:SUMO_HOME
-# Should print: C:\Program Files (x86)\Eclipse\Sumo
+Restart the API process after changing the environment. Select **SUMO** in the dashboard Settings page. The application uses the included `simulation/run.sumocfg` configuration; the mode switcher launches the SUMO GUI.
+
+### Optional: video / YOLO setup
+
+Place the YOLOv4-Tiny weights file at `yolo/yolov4-tiny.weights`. The configuration and class-name files are `yolo/yolov4-tiny.cfg` and `yolo/coco.names`. Select VIDEO mode and provide one video for each of the north, south, east, and west lanes in the upload flow.
+
+## Configuration
+
+The default local setup does not read a `.env` file. Settings are defined in `controller/config.py` or passed through the process environment by the API. The API and frontend currently use fixed local addresses (`127.0.0.1:8000` and `localhost:3000`).
+
+| Setting | Where it is read | Default | Description |
+| --- | --- | --- | --- |
+| `DATA_SOURCE` | Controller process environment | `MOCK` | Traffic source: `MOCK`, `SUMO`, or `VIDEO`. The API sets this when it launches the controller. |
+| `SUMO_HOME` | Controller process environment | Unset | SUMO installation directory. Required for SUMO mode; without it the controller falls back to MOCK. |
+| `VIDEO_PATHS` | Controller process environment | Unset | JSON map of lane IDs to video paths. Set internally by the API after upload; usually not configured manually. |
+| `MIN_GREEN` | `controller/config.py` | `8` seconds | Minimum green phase duration. |
+| `MAX_GREEN` | `controller/config.py` | `40` seconds | Maximum green phase duration. |
+| `YELLOW_TIME` | `controller/config.py` | `4` seconds | Yellow phase duration. |
+| `STARVATION_THRESHOLD` | `controller/config.py` | `3` cycles | Threshold used by the controller's starvation handling. |
+| `TLS_ID` | `controller/config.py` | `J1` | SUMO traffic-light identifier. |
+| `DIRECTIONS` | `controller/config.py` | `N_J1`, `E_J1`, `S_J1`, `W_J1` | Incoming lane IDs used by the controller. |
+
+## API overview
+
+Base URL: `http://127.0.0.1:8000`. Start the API before using these examples.
+
+```bash
+# Check the live signal state
+curl http://127.0.0.1:8000/live-status
+
+# Start in MOCK mode
+curl -X POST 'http://127.0.0.1:8000/simulation/start?mode=MOCK'
+
+# Switch to SUMO mode
+curl -X POST 'http://127.0.0.1:8000/simulation/switch-mode?mode=SUMO'
+
+# Stop the controller
+curl -X POST http://127.0.0.1:8000/simulation/stop
 ```
 
-**3.** Switch to SUMO mode in Settings — SUMO-GUI opens automatically.
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/` | API health message. |
+| `GET` | `/live-status` | Current signal and traffic status. |
+| `GET` | `/simulation/status` | Controller process status. |
+| `GET` | `/simulation/current-mode` | Current source mode. |
+| `POST` | `/simulation/start?mode=MOCK` | Start the controller. Accepts `MOCK`, `SUMO`, or `VIDEO`. |
+| `POST` | `/simulation/switch-mode?mode=MOCK` | Restart the controller with another source mode. |
+| `POST` | `/simulation/stop` | Stop the controller. |
+| `POST` | `/simulation/flush-model` | Delete the saved Q-table. |
+| `POST` | `/analysis/start` | Upload `north`, `south`, `east`, and `west` video files and start video analysis. |
+| `GET` | `/analysis/status` | Controller status for analysis. |
+| `WS` | `/ws/logs` | Stream controller log lines. |
 
----
+The full request and response schemas are available in the interactive docs at `/docs`.
 
-## 🎥 VIDEO / YOLO Mode Setup
+## Project structure
 
-> Skip this if you only need MOCK or SUMO mode.
-
-**1. Download YOLOv4-Tiny model files** and place them in the `yolo/` folder:
-
-| File | Source |
-|------|--------|
-| `yolov4-tiny.weights` | [AlexeyAB Darknet Releases](https://github.com/AlexeyAB/darknet/releases) |
-| `yolov4-tiny.cfg` | Included in this repo |
-| `coco.names` | Included in this repo |
-
-**2.** Switch to VIDEO mode in Settings → the upload wizard opens.
-
-**3.** Upload one video per lane → click **Start YOLO Analysis**.
-
----
-
-## 📡 API Reference
-
-Base URL: `http://127.0.0.1:8000`
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/live-status` | Signal state, vehicle counts, phase, timer, per-lane signals |
-| `GET` | `/simulation/status` | Whether the controller is running |
-| `GET` | `/simulation/current-mode` | Active data source (MOCK / SUMO / VIDEO) |
-| `POST` | `/simulation/start?mode=MOCK` | Start controller in specified mode |
-| `POST` | `/simulation/stop` | Stop the running controller |
-| `POST` | `/simulation/switch-mode?mode=SUMO` | Stop + restart in a new mode |
-| `POST` | `/analysis/start` | Upload 4 video files + start YOLO analysis |
-| `GET` | `/docs` | Interactive Swagger UI for all endpoints |
-
----
-
-## 🧠 Q-Learning — How the Agent Learns
-
-```
-Every traffic cycle:
-
-  1. OBSERVE STATE
-     state = (N_traffic_level, E_traffic_level, S_traffic_level, W_traffic_level)
-     where each level = 0 (0–4 vehicles) | 1 (5–14 vehicles) | 2 (15+ vehicles)
-
-  2. CHOOSE ACTION  (which lane gets green next)
-     • With probability ε  → random lane  (exploration)
-     • With probability 1-ε → argmax Q(state) (exploitation)
-     • ε decays: 0.20 → 0.05 over thousands of cycles
-
-  3. RUN PHASE
-     green_time = clamp(vehicle_count × 2 × speed_factor, MIN_GREEN, MAX_GREEN)
-
-  4. OBSERVE REWARD
-     reward = −average_waiting_time
-     (minimising wait time = maximising reward)
-
-  5. UPDATE Q-TABLE  (Bellman equation)
-     Q(s,a) ← Q(s,a) + α [ r + γ · max_a' Q(s', a') − Q(s,a) ]
-               α = 0.1 (learning rate)
-               γ = 0.9 (discount factor)
-
-  6. SAVE
-     Q-table written to q_table.pkl after every session
-     Loaded back on next startup — agent remembers everything
+```text
+.
+├── backend/                 FastAPI app and controller process service
+├── controller/
+│   ├── analytics/           Traffic analysis, metrics, CSV logging, plotting
+│   ├── core/                Signal phases and controller logic
+│   ├── ml_models/           Q-learning agent
+│   ├── config.py            Controller settings
+│   ├── main.py              Controller cycle loop
+│   └── source_selector.py   MOCK, SUMO, and VIDEO data sources
+├── frontend/
+│   ├── public/              Static app assets
+│   └── src/                 React dashboard and components
+├── simulation/              SUMO network, routes, and configuration
+├── yolo/                    YOLO config and class names; weights are external/ignored
+├── yolo_detection.py        OpenCV/YOLO detection helper
+├── requirements.txt         Python dependencies
+└── README.md
 ```
 
----
+Runtime outputs such as uploaded videos, live status, metrics, plots, and the learned Q-table are generated locally.
 
-## 🛠️ Tech Stack
+## Roadmap
 
-| Layer | Technology | Role |
-|-------|-----------|------|
-| Frontend | React 18, Recharts, Lucide Icons | Dashboard UI |
-| Styling | Vanilla CSS — glassmorphism, dark mode | Visual design |
-| Backend | FastAPI + Uvicorn | REST API |
-| Controller | Python 3.10+ | Signal cycle logic |
-| AI/ML | Q-Learning, NumPy | Adaptive signal decisions |
-| Vision | YOLOv4-Tiny + OpenCV | Vehicle detection |
-| Simulation | SUMO + TraCI | Traffic simulation |
-| Storage | JSON (atomic), CSV, Pickle | State, logs, Q-table |
+- Add automated setup and dependency checks for optional SUMO and YOLO modes.
+- Make API and frontend addresses configurable instead of fixed to localhost.
+- Add reproducible sample scenarios and documented performance evaluation.
+- Expand automated integration coverage for mode switching and video input.
 
----
+## Contributing
 
-## 📄 License
+Contributions are welcome. Open an issue to discuss larger changes, then submit a pull request with a focused description. Keep changes scoped, update documentation when behavior or setup changes, and avoid committing generated files, uploaded videos, model weights, or secrets.
 
-Distributed under the **MIT License** — see [LICENSE](LICENSE) for details.
+## License
 
----
+Distributed under the MIT License. See [LICENSE](LICENSE) for details.
 
-<div align="center">
+## Contact and acknowledgments
 
-**Smart Traffic Light Management System**
-Built with Python · FastAPI · React · Q-Learning · YOLOv4
+Maintainer: [Vishal Jatav](https://github.com/vishaljatav777). See the repository's Issues page for questions and bug reports.
 
-</div>
+Thanks to the maintainers of FastAPI, React, Eclipse SUMO, OpenCV, and the YOLO/Darknet project for the tools and resources used here.
